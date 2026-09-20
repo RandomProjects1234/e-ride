@@ -18,6 +18,9 @@ import { ChaseCam } from './game/camera.js';
 import { Tricks, ptsToCash } from './game/tricks.js';
 import { QuestSystem } from './game/quests.js';
 import { Effects } from './game/effects.js';
+import { Traffic } from './game/traffic.js';
+import { Police } from './game/police.js';
+import { Pickups } from './game/pickups.js';
 import { Trailer } from './game/trailer.js';
 
 import { HUD } from './ui/hud.js';
@@ -64,6 +67,16 @@ class Game {
     this.hud = new HUD(this.world);
     this.cam = new ChaseCam(this.engine.camera, this.world);
     this.fx = new Effects(this.engine.scene, this.world);
+    this.traffic = new Traffic(this.engine.scene, this.world);
+    this.police = new Police(this.world);
+    this.pickups = new Pickups(this.engine.scene, this.world, economy.data.cells || []);
+    this.slowmo = 1;
+    this.tricks.onTrick = (label, pts, mult) => {
+      if (pts < 8) return;
+      const big = pts >= 180;
+      this.hud.popup(label.toUpperCase(), '+' + pts, big ? '#ffd34d' : '#39e6a4');
+      if (big) this.cam.addShake(0.35);
+    };
     this.quests = new QuestSystem(this.world, economy);
     this.net = new NetClient(this);
     this.touch = new TouchControls(this);
@@ -376,7 +389,7 @@ class Game {
       return;
     }
     if (this.state === 'menu' || !this.player) { this.menuCam(dt); this.engine.render(); return; }
-    if (!this.paused && !isMenuOpen()) this.update(dt);
+    if (!this.paused && !isMenuOpen()) this.update(dt * this.slowmo);
     else this.updatePausedVisuals(dt);
     this.engine.render();
     if (this.afterRender) this.afterRender();
@@ -509,6 +522,24 @@ class Game {
     /* ---- charging ---- */
     this.updateCharging(dt, b);
 
+    /* ---- a city that is actually doing something ---- */
+    this.traffic.update(dt, b, this.police);
+    this.police.sample(dt, b, this.world, this.traffic);
+    this.police.update(dt, b);
+    this.pickups.update(dt, b, this.engine.elapsed);
+    this.handleNearMiss(dt, b);
+    this.handleTrafficHit(b);
+    this.handlePickups(b);
+    this.handlePolice(b);
+
+    /* ---- feel: slow-mo on a big one, speed lines when you are flying ---- */
+    const bigAir = !b.grounded && b.airTime > 0.85;
+    this.slowmo = damp(this.slowmo, bigAir ? 0.45 : 1, bigAir ? 9 : 5, dt);
+    document.body.classList.toggle('slowmo', this.slowmo < 0.9);
+    document.body.classList.toggle('fast', Math.abs(b.speed) > b.stats.topSpeedMs * 0.82);
+    this.hud.updateWanted(this.police);
+    this.hud.setCells(this.pickups.collected, this.pickups.total);
+
     /* ---- systems ---- */
     this.quests.update(dt, this, b);
     this.net.update(dt);
@@ -529,7 +560,7 @@ class Game {
     this.hud.updateWheelie(b, this.tricks);
     this.hud.updateCombo(this.tricks);
     this.hud.setQuest(this.quests.trackerInfo());
-    this.hud.updateMinimap(b, this.minimapPlayers(), this.quests.markers());
+    this.hud.updateMinimap(b, this.minimapPlayers(), this.quests.markers().concat(this.minimapExtra(b)));
     this.hud.updateFps(this.engine.fps);
     this.hud.setPlayers(this.net.playerCount, this.net.connected);
     this.updatePrompt();
@@ -548,6 +579,91 @@ class Game {
       }
       economy.save();
       this.hud.setCash(economy.cash, false);
+    }
+  }
+
+  /** squeezing past traffic at speed is worth points and a bit of heat */
+  handleNearMiss(dt, b) {
+    const nm = this.traffic.nearMiss;
+    this._nmCool = Math.max(0, (this._nmCool || 0) - dt);
+    if (!nm || this._nmCool > 0 || b.crashed) return;
+    this._nmCool = 0.45;
+    const mph = nm.speed * MS_TO_MPH;
+    const tight = 1 - (nm.d - 1.25) / 2.15;               // 0..1, 1 = paint-scraping
+    const pts = Math.round((14 + mph * 0.5) * (0.6 + tight));
+    this.tricks.add(tight > 0.62 ? 'Paint scrape!' : 'Near miss', pts);
+    this.tricks.bumpMult(tight > 0.62 ? 0.22 : 0.12);
+    this.police.addHeat(0.16 + tight * 0.14);
+    this.cam.addShake(0.16 + tight * 0.22);
+    audio.ui('click');
+    this.hud.popup(tight > 0.62 ? 'PAINT SCRAPE' : 'NEAR MISS', '+' + pts, '#16c2ff');
+  }
+
+  /** riding into a car is exactly as good an idea as it sounds */
+  handleTrafficHit(b) {
+    if (b.crashed || !this.traffic.enabled) return;
+    const car = this.traffic.hitTest(b.pos.x, b.pos.z, 0.5);
+    if (!car) return;
+    const mph = Math.abs(b.speed) * MS_TO_MPH;
+    this.police.addHeat(0.55);
+    if (mph > 16) {
+      b.crash('Hit a car');
+      this.fx.crashBurst(b.pos);
+      this.cam.addShake(1.1);
+    } else {
+      b.speed *= -0.25;
+      this.cam.addShake(0.5);
+    }
+    car.honk = 1.4;
+  }
+
+  handlePickups(b) {
+    for (const e of this.pickups.drain()) {
+      if (e.t === 'cell') {
+        economy.earn(45);
+        economy.data.cells = this.pickups.save();
+        this.hud.setCash(economy.cash);
+        this.fx.emit(e.x, e.y, e.z, 0, 2.4, 0, 0.45, 0x39e6a4, 0.9);
+        audio.ui('ok');
+        const done = e.n >= e.total;
+        this.hud.toast(done
+          ? `⚡ ALL ${e.total} CELLS FOUND — the city is yours`
+          : `⚡ Energy cell ${e.n}/${e.total} &nbsp;<b>+$45</b>`, 'cash', done ? 6000 : 2200);
+        if (done) economy.earn(25000);
+      } else if (e.t === 'boost') {
+        b.speed = Math.min(b.speed * 1.22 + 3.5, b.stats.topSpeedMs * 1.02);
+        b.charge = clamp(b.charge + 0.06, 0, 1);
+        this.tricks.add('Boost gate', 20);
+        this.tricks.bumpMult(0.1);
+        this.cam.addShake(0.5);
+        this.fx.emit(e.x, e.y, e.z, 0, 1.5, 0, 0.6, 0x16c2ff, 0.7);
+        audio.ui('ok');
+        this.hud.popup('BOOST', '', '#16c2ff');
+      }
+    }
+  }
+
+  handlePolice(b) {
+    for (const e of this.police.drain()) {
+      if (e.t === 'level') {
+        this.hud.toast(`🚨 <b>${escapeHtml(e.name)}</b> — level ${e.level}`, 'bad', 2600);
+        audio.ui('err');
+        this.cam.addShake(0.4);
+      } else if (e.t === 'escaped') {
+        economy.earn(e.payout);
+        this.hud.setCash(economy.cash);
+        this.hud.toast(`🏁 <b>Lost them</b> after ${e.seconds}s &nbsp;<b>+${fmtMoney(e.payout)}</b>`, 'cash', 5000);
+        this.tricks.add('Clean getaway', 150 * e.level);
+        audio.ui('ok');
+        economy.data.records.escapes = (economy.data.records.escapes || 0) + 1;
+      } else if (e.t === 'busted') {
+        economy.spend(Math.min(e.fine, economy.cash));
+        this.hud.setCash(economy.cash);
+        this.hud.toast(`🚔 <b>Busted</b> — fined ${fmtMoney(e.fine)}`, 'bad', 4500);
+        this.tricks.onCrash();
+        b.crash('Pulled over');
+        audio.ui('err');
+      }
     }
   }
 
@@ -572,6 +688,12 @@ class Game {
       this._warnedLow = true;
       this.hud.toast('🪫 Battery low — stop on any glowing ring to charge', 'bad', 4500);
     } else if (b.charge > 0.35) this._warnedLow = false;
+  }
+
+  minimapExtra(b) {
+    const out = this.pickups.blips(b.pos.x, b.pos.z, 170);
+    for (const u of this.police.units) out.push({ x: u.x, z: u.z, c: '#ff4d5e' });
+    return out;
   }
 
   minimapPlayers() {

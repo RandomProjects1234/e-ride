@@ -252,7 +252,19 @@ function inboxPane(game, filter, setFilter) {
 /* ---------------- roadmap ---------------- */
 const CHANGELOG = [
   {
-    v: VERSION, when: 'First public beta — Volta Bay',
+    v: 'BETA 0.2', when: 'Update 2 — A city with something in it',
+    lines: [
+      'Traffic: cars and vans drive the road network, and they brake for you (mostly).',
+      'Pedestrians on the pavements, who scatter when you come at them.',
+      'Near misses: squeeze past a car at speed for points and a multiplier tick.',
+      'Police. Ride badly enough and they turn up — four wanted levels, and a payout for losing them.',
+      '120 energy cells hidden across Volta Bay, plus boost gates on the fast roads.',
+      'Slow-motion on big air, score flashes, and a speed-line effect when you are flat out.',
+      'Fixed: e-scooters literally could not wheelie — the maths made it impossible.',
+    ],
+  },
+  {
+    v: 'BETA 0.1', when: 'First public beta — Volta Bay',
     lines: [
       'The whole of Volta Bay: downtown, Cellside, Cell Works, Torque Ridge, Amp Park, the Bay Front and the Mile.',
       'Three starter machines and ten more to buy, from a 250 W commuter hub to a 900 kW reactor drive.',

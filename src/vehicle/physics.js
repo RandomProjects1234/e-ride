@@ -30,6 +30,7 @@ const LEAN_K = 8.0;      // lean-forward / catch authority
 const P_GAIN = 26;       // rider tracking stiffness
 const D_GAIN = 7.5;      // rider tracking damping
 const LOOP_MARGIN = 0.30;
+const COS_REF = Math.cos(0.75);   // a typical bike's theta0, as the yardstick
 
 export class VehicleBody {
   constructor(stats, world) {
@@ -307,8 +308,14 @@ export class VehicleBody {
     const p = this.pitch;
     const assist = this.assist ?? 0;
 
-    // gravity: restoring below the balance point, tipping you over above it
-    const aGrav = -GRAV_K * (Math.cos(this.theta0 + p) / Math.cos(this.theta0));
+    /* Gravity: restoring below the balance point, tipping you over above it.
+       Normalising by cos(theta0) — this vehicle's own geometry — cancelled
+       the geometry out, so a short scooter needed exactly as much torque to
+       lift as a long bike and the starter scooter could never wheelie at
+       all. Referencing a fixed typical geometry instead means a short
+       wheelbase and a high centre of mass genuinely help, as they do in
+       real life. */
+    const aGrav = -GRAV_K * (Math.cos(this.theta0 + p) / COS_REF);
     let a = aGrav;
 
     if (this.grounded) {

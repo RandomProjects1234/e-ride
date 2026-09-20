@@ -1,8 +1,8 @@
-# E-Ride — BETA 0.1
+# E-Ride — BETA 0.2
 
 [![play](https://img.shields.io/badge/play-randomprojects1234.github.io%2Fe--ride-39e6a4)](https://randomprojects1234.github.io/e-ride/)
 [![licence](https://img.shields.io/badge/licence-MIT-16c2ff)](LICENSE)
-[![version](https://img.shields.io/badge/version-BETA%200.1-a06bff)](#versions)
+[![version](https://img.shields.io/badge/version-BETA%200.2-a06bff)](#versions)
 
 **Play it: <https://randomprojects1234.github.io/e-ride/>**
 
@@ -86,6 +86,20 @@ yourself, scroll to zoom, and scroll all the way in for first person. The angle
 you pick is kept as an offset from straight-behind, so the camera still comes
 round with you through corners instead of leaving you staring at a wall. `V`
 puts it back.
+
+**The city rides back.** Cars and vans drive the road network and pedestrians
+walk the pavements. Squeezing past a car at speed scores a **near miss**;
+hitting one hurts and makes you interesting to the police.
+
+**Heat and pursuit.** Speeding, pavement riding, wheelies down a public street
+and jumping over traffic all build heat. Past a threshold the police turn up —
+four wanted levels, more units at each. Put 165 m between you and them and hold
+it for seven seconds and you lose them, and the longer the chase ran the bigger
+the payout. Get caught while barely moving and you are fined.
+
+**120 energy cells** are hidden across Volta Bay — a one-time collect each,
+saved to your game. Boost gates on the fast roads respawn and are worth a kick
+of speed and a combo tick.
 
 **Charging.** Every glowing ring is a charge point. Stop on one and the pack
 refills. Range is a real stat, so a 2 kWh pack on a 900 kW motor will not get
@@ -198,6 +212,7 @@ followed by 1.0.
 
 | | |
 | --- | --- |
+| **BETA 0.2** | traffic, pedestrians, near misses, police pursuit, 120 collectible cells, boost gates, slow-mo on big air — and e-scooters can wheelie now |
 | **BETA 0.1** | first public build — the whole of Volta Bay, 13 machines, the parts system, jobs, tricks, multiplayer, the suggestion box |
 
 What lands in BETA 0.2 is whatever gets approved in the suggestion box.

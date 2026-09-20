@@ -45,6 +45,7 @@ export class Economy {
       marketSeed: Date.now(),
       marketRefreshed: 0,
       quests: { done: [], active: null, board: [], boardSeed: 0, streak: 0 },
+      cells: [],
       records: {
         distance: 0, topSpeedMs: 0, bestWheelieTime: 0, bestWheelieDist: 0,
         bestAir: 0, crashes: 0, earned: 0, spent: 0, tricksBanked: 0,

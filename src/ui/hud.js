@@ -16,6 +16,9 @@ export class HUD {
       spFill: $('#sp-fill'), spNum: $('#sp-num'), spUnit: $('#sp-unit'),
       battFill: $('#batt-fill'), battPct: $('#batt-pct'),
       cash: $('#cash'), vehname: $('#vehname'), players: $('#playercount'),
+      wanted: $('#wanted'), wantedStars: $('#wanted-stars'), wantedName: $('#wanted-name'),
+      wantedFill: $('#wanted-fill'), popups: $('#popups'),
+      cellCount: $('#cellcount'), cellN: $('#cell-n'), cellT: $('#cell-t'),
       wheelie: $('#wheelie-hud'), whMarker: $('#wh-marker'), whZone: $('#wh-zone'),
       whTime: $('#wh-time'), whDist: $('#wh-dist'),
       combo: $('#combo'), comboMult: $('#combo-mult'), comboPts: $('#combo-pts'),
@@ -52,6 +55,36 @@ export class HUD {
   }
 
   setVehicleName(n) { this.el.vehname.textContent = n; }
+
+  /** big centre-screen score flash — the payoff for doing something well */
+  popup(label, value, color = '#39e6a4') {
+    const p = document.createElement('div');
+    p.className = 'pop';
+    p.style.color = color;
+    p.innerHTML = (value ? `<b>${value}</b>` : '') + `<i>${label}</i>`;
+    this.el.popups.appendChild(p);
+    setTimeout(() => p.remove(), 1150);
+    while (this.el.popups.children.length > 5) this.el.popups.firstChild.remove();
+  }
+
+  /** the wanted meter: stars, level name, and how close you are to losing them */
+  updateWanted(police) {
+    const on = police.chasing && police.level > 0;
+    this.el.wanted.classList.toggle('hidden', !on);
+    if (!on) return;
+    const lv = Math.min(police.level, 4);
+    this.el.wantedStars.textContent = '★'.repeat(lv) + '☆'.repeat(Math.max(0, 4 - lv));
+    const esc = police.escapeProgress;
+    this.el.wanted.classList.toggle('escaping', esc > 0.05);
+    this.el.wantedName.textContent = esc > 0.05 ? 'losing them…' : police.levelName;
+    this.el.wantedFill.style.width = (esc * 100).toFixed(0) + '%';
+  }
+
+  setCells(n, total) {
+    this.el.cellCount.classList.toggle('hidden', !total);
+    this.el.cellN.textContent = n;
+    this.el.cellT.textContent = total;
+  }
 
   setCash(v, animate = true) {
     if (animate && v !== this._cash) {

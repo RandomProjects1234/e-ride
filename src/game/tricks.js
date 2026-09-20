@@ -27,9 +27,13 @@ export class Tricks {
     this.comboPts = 0; this.mult = 1; this.sinceTrick = 99; this.events.length = 0;
   }
 
+  /** set by the game so a trick can flash on screen the instant it lands */
+  onTrick = null;
+
   add(label, pts) {
     if (pts <= 0) return;
     this.comboPts += pts;
+    this.onTrick && this.onTrick(label, Math.round(pts), this.mult);
     this.sinceTrick = 0;
     this.popped = true;
     const e = this.events.find((x) => x.label === label);

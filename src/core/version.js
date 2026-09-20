@@ -8,7 +8,7 @@
    ============================================================ */
 
 export const MAJOR = 0;
-export const MINOR = 1;
+export const MINOR = 2;
 
 /** "BETA 0.1", "MAIN 1.0", "MAIN 2.3" … */
 export function versionLabel(major = MAJOR, minor = MINOR) {

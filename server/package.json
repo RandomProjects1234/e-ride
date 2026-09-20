@@ -1,12 +1,14 @@
 {
   "name": "e-ride-server",
-  "version": "0.1.0",
-  "displayVersion": "BETA 0.1",
+  "version": "0.2.0",
+  "displayVersion": "BETA 0.2",
   "private": true,
   "description": "WebSocket relay server for E-Ride multiplayer (up to 6 riders per room).",
   "main": "server.js",
   "type": "commonjs",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"

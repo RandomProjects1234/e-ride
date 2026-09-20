@@ -347,7 +347,7 @@ export function stats(build, opts = {}) {
   const geom = clamp(cogH / (wb * 0.42), 0.7, 1.45);
   const wheelieEase = clamp(
     (0.35 + torqueTerm * 0.75) * (P.cockpit ? P.cockpit.wheelie : 1)
-    * geom * (frame?.cls === 'scooter' ? 0.72 : 1),
+    * geom * (frame?.cls === 'scooter' ? 0.82 : 1),
     0.12, 2);
 
   const brakeDecel = (P.brakes ? P.brakes.force : 4) * (grip / 0.95);
