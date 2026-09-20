@@ -1,7 +1,7 @@
 {
   "name": "e-ride",
-  "version": "0.2.0",
-  "displayVersion": "BETA 0.2",
+  "version": "0.3.0",
+  "displayVersion": "BETA 0.3",
   "private": true,
   "description": "E-Ride - a 3D open-world e-bike and e-scooter game. Static client (GitHub Pages) + Node relay for multiplayer.",
   "scripts": {

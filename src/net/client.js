@@ -1,38 +1,44 @@
 /* ============================================================
-   client.js — WebSocket multiplayer client
+   client.js - multiplayer client (PeerJS, no server to run)
 
-   The client is static (GitHub Pages friendly); the relay server
-   lives wherever you run it. The URL is configurable in-game and
-   remembered in localStorage.
+   One player hosts and gets a five-character room code; everyone
+   else types it in. The connection is peer-to-peer over WebRTC -
+   PeerJS's public broker is only used to introduce the browsers to
+   each other, and no game traffic goes through it.
+
+   The host also runs the room logic in-process (src/net/room.js),
+   so the protocol below is identical to the one the old Node relay
+   spoke and nothing above this layer had to change.
    ============================================================ */
 import { RemotePlayer, RIDER_COLORS } from '../game/player.js';
 import { economy } from '../game/economy.js';
 import { settings } from '../core/settings.js';
 import { escapeHtml, uid } from '../core/util.js';
 import { audio } from '../core/audio.js';
+import { PeerLink, makeCode, normalizeCode } from './peer.js';
+import { MAX_PLAYERS } from './room.js';
 
-const LS_URL = 'eride.server';
 const LS_ROOM = 'eride.room';
 const SEND_HZ = 15;
-export const MAX_PLAYERS = 6;
+export { MAX_PLAYERS };
 
-export function defaultServerUrl() {
-  const saved = localStorage.getItem(LS_URL);
-  if (saved) return saved;
-  const h = location.hostname;
-  if (h === 'localhost' || h === '127.0.0.1' || h === '') return 'ws://localhost:3496';
-  return '';
+/** a ?join=CODE link drops you straight into someone's room */
+export function codeFromUrl() {
+  try {
+    const c = new URL(location.href).searchParams.get('join');
+    return c ? normalizeCode(c) : '';
+  } catch (e) { return ''; }
 }
 
 export class NetClient {
   constructor(game) {
     this.game = game;
-    this.ws = null;
+    this.link = null;
     this.connected = false;
     this.connecting = false;
     this.id = null;
+    this.mode = null;                 // 'host' | 'guest'
     this.room = localStorage.getItem(LS_ROOM) || '';
-    this.url = defaultServerUrl();
     this.playerCount = 1;
     this.ping = 0;
     this._acc = 0;
@@ -40,86 +46,90 @@ export class NetClient {
     this.status = 'offline';
     this.error = '';
     this.chat = [];
-    this.onUpdate = null;         // UI hook
-    this._reconnectAt = 0;
-    this._retries = 0;
-    this._wantConnected = false;
+    this.onUpdate = null;             // UI hook
   }
 
-  setUrl(u) { this.url = u.trim(); localStorage.setItem(LS_URL, this.url); }
-  setRoom(r) { this.room = (r || '').trim().slice(0, 24); localStorage.setItem(LS_ROOM, this.room); }
+  get isHost() { return this.mode === 'host'; }
+  get shareLink() { return this.link ? this.link.shareLink : ''; }
+
+  setRoom(r) { this.room = normalizeCode(r); localStorage.setItem(LS_ROOM, this.room); }
 
   /* ---------------- connection ---------------- */
-  connect() {
+  _link() {
+    return new PeerLink({
+      onMessage: (m) => this._handle(m),
+      onStatus: (st, detail) => {
+        if (st === 'hosting' || st === 'connected') {
+          this.connecting = false;
+          this.connected = true;
+          this.status = 'connected';
+          this.error = '';
+          this.sendHello();
+        } else if (st === 'connecting') {
+          this.connecting = true;
+          this.status = 'connecting';
+        } else if (st === 'offline') {
+          const was = this.connected;
+          this.connected = false;
+          this.connecting = false;
+          this.id = null;
+          this.playerCount = 1;
+          this.clearRemotes();
+          if (this.status !== 'error') this.status = 'offline';
+          if (was) this.game.hud.toast('Ride-out ended', 'bad');
+        }
+        this._emit();
+      },
+      onError: (msg) => {
+        this.error = msg;
+        this.status = 'error';
+        this.connecting = false;
+        this._emit();
+      },
+      onCount: (n) => { this.playerCount = n; this._emit(); },
+    });
+  }
+
+  /** open a room and become its host */
+  async host(code) {
     if (this.connecting || this.connected) return;
-    if (!this.url) { this.error = 'No server address set.'; this._emit(); return; }
-    let url = this.url;
-    if (!/^wss?:\/\//.test(url)) url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + url;
-    if (location.protocol === 'https:' && url.startsWith('ws://')) {
-      this.error = 'This page is served over HTTPS, so the server must be wss:// (a secure WebSocket).';
-      this.status = 'error'; this._emit(); return;
+    this.disconnect();
+    this.mode = 'host';
+    this.link = this._link();
+    this.room = normalizeCode(code) || makeCode();
+    localStorage.setItem(LS_ROOM, this.room);
+    try { await this.link.host(this.room); }
+    catch (e) { this.error = e.message; this.status = 'error'; this.connecting = false; this._emit(); return; }
+    if (this.status !== 'error') {
+      this.game.hud.toast(`Room <b>${escapeHtml(this.room)}</b> is open - share the code`, 'info', 5000);
     }
+  }
 
-    this._wantConnected = true;
-    this.connecting = true;
-    this.status = 'connecting';
-    this.error = '';
-    this._emit();
+  /** join somebody else's room */
+  async join(code) {
+    if (this.connecting || this.connected) return;
+    this.disconnect();
+    this.mode = 'guest';
+    this.link = this._link();
+    this.room = normalizeCode(code);
+    localStorage.setItem(LS_ROOM, this.room);
+    try { await this.link.join(this.room); }
+    catch (e) { this.error = e.message; this.status = 'error'; this.connecting = false; this._emit(); return; }
+  }
 
-    let ws;
-    try { ws = new WebSocket(url); }
-    catch (e) { this.connecting = false; this.status = 'error'; this.error = e.message; this._emit(); return; }
-    this.ws = ws;
-
-    const timeout = setTimeout(() => {
-      if (!this.connected) { try { ws.close(); } catch (e) {} }
-    }, 9000);
-
-    ws.onopen = () => {
-      clearTimeout(timeout);
-      this.connecting = false;
-      this.connected = true;
-      this.status = 'connected';
-      this._retries = 0;
-      this.sendHello();
-      this._emit();
-      this.game.hud.toast('🛰️ Connected to the ride-out server', 'info');
-    };
-
-    ws.onmessage = (ev) => {
-      let m;
-      try { m = JSON.parse(ev.data); } catch (e) { return; }
-      this._handle(m);
-    };
-
-    ws.onerror = () => {
-      this.error = 'Could not reach ' + url;
-      this.status = 'error';
-      this._emit();
-    };
-
-    ws.onclose = () => {
-      clearTimeout(timeout);
-      const wasConnected = this.connected;
-      this.connected = false;
-      this.connecting = false;
-      this.id = null;
-      this.playerCount = 1;
-      this.clearRemotes();
-      if (this.status !== 'error') this.status = 'offline';
-      this._emit();
-      if (wasConnected) this.game.hud.toast('Disconnected from the server', 'bad');
-      if (this._wantConnected && this._retries < 5) {
-        this._retries++;
-        this._reconnectAt = performance.now() + 2500 * this._retries;
-      }
-    };
+  /** kept so old call sites (and the ?join= link) still work */
+  connect() {
+    if (this.room) this.join(this.room);
+    else this.host(makeCode());
   }
 
   disconnect() {
-    this._wantConnected = false;
-    this._retries = 99;
-    if (this.ws) { try { this.ws.close(); } catch (e) {} }
+    if (this.link) { this.link.close(); this.link = null; }
+    this.mode = null;
+    this.connected = false;
+    this.connecting = false;
+    this.id = null;
+    this.playerCount = 1;
     this.clearRemotes();
     this.status = 'offline';
     this._emit();
@@ -139,8 +149,8 @@ export class NetClient {
   _emit() { this.onUpdate && this.onUpdate(this); }
 
   send(o) {
-    if (!this.connected || !this.ws || this.ws.readyState !== 1) return;
-    try { this.ws.send(JSON.stringify(o)); } catch (e) {}
+    if (!this.link) return;
+    this.link.send(o);
   }
 
   /* ---------------- outgoing ---------------- */
@@ -164,13 +174,9 @@ export class NetClient {
   kickPassenger() { this.send({ t: 'kick' }); }
 
   update(dt) {
-    if (!this.connected) {
-      if (this._wantConnected && this._reconnectAt && performance.now() > this._reconnectAt) {
-        this._reconnectAt = 0;
-        this.connect();
-      }
-      return;
-    }
+    if (!this.connected) return;
+    // the host is also the relay, so it has to run the room every frame
+    if (this.link) this.link.tick(dt);
     this._acc += dt;
     if (this._acc >= 1 / SEND_HZ) {
       this._acc = 0;
@@ -197,6 +203,7 @@ export class NetClient {
         this.room = m.room;
         localStorage.setItem(LS_ROOM, this.room);
         this.playerCount = (m.players?.length || 0) + 1;
+        if (this.link) this.link.setGuestCount(this.playerCount);
         for (const p of m.players || []) this._addRemote(p);
         this._emit();
         break;
@@ -204,6 +211,7 @@ export class NetClient {
       case 'join': {
         this._addRemote(m.p);
         this.playerCount = g.remote.size + 1;
+        if (this.link) this.link.setGuestCount(this.playerCount);
         g.hud.toast(`👋 <b>${escapeHtml(m.p.name)}</b> joined the ride`, 'info');
         this._emit();
         break;
@@ -222,9 +230,17 @@ export class NetClient {
         break;
       }
       case 'S': {              // batched states
+        let unknown = false;
         for (const e of m.a) {
           const r = g.remote.get(e.i);
           if (r) r.applySnapshot(e.s);
+          else if (e.i !== this.id) unknown = true;
+        }
+        // somebody is being sent to us that we have no model for — ask for
+        // the full picture again, at most once every few seconds
+        if (unknown) {
+          const now = performance.now();
+          if (now - (this._lastResync || 0) > 4000) { this._lastResync = now; this.sendHello(); }
         }
         break;
       }
@@ -262,8 +278,9 @@ export class NetClient {
       }
       case 'pong': { this.ping = Date.now() - m.ts; break; }
       case 'full': {
-        this.error = 'That room is full (max ' + MAX_PLAYERS + ' riders).';
+        this.error = `That room is full (max ${MAX_PLAYERS} riders).`;
         this.status = 'error';
+        this.disconnect();
         this._emit();
         break;
       }
@@ -277,7 +294,14 @@ export class NetClient {
 
   _addRemote(p) {
     const g = this.game;
-    if (g.remote.has(p.id)) return;
+    if (p.id === this.id) return;
+    const existing = g.remote.get(p.id);
+    if (existing) {
+      existing.name = p.name;
+      if (p.build) existing.setBuild(p.build);
+      if (p.s) existing.applySnapshot(p.s);
+      return;
+    }
     const r = new RemotePlayer(g.world, g.engine.scene, {
       id: p.id, name: p.name, colorIdx: p.colorIdx ?? 1,
       build: p.build || g.player.build,

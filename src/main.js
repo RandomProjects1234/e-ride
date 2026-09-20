@@ -35,7 +35,7 @@ import { TouchControls } from './ui/touch.js';
 import { openMultiplayer, playerListPanel } from './ui/mpui.js';
 import { openFeedback } from './ui/feedback.js';
 
-import { NetClient } from './net/client.js';
+import { NetClient, codeFromUrl } from './net/client.js';
 import { PRESETS, PRESET_BY_ID } from './vehicle/parts.js';
 import { stats as computeStats, buildFromPreset } from './vehicle/build.js';
 
@@ -91,6 +91,13 @@ class Game {
 
     if (economy.exists) this.showMainMenu();
     else this.showIntro();
+
+    // a ?join=CODE invite link drops you straight into that room
+    const invite = codeFromUrl();
+    if (invite && economy.exists) {
+      this.net.join(invite);
+      this.hud.toast(`Joining room <b>${escapeHtml(invite)}</b>…`, 'info', 4000);
+    }
 
     this.loop();
 

@@ -1,7 +1,7 @@
 {
   "name": "e-ride-server",
-  "version": "0.2.0",
-  "displayVersion": "BETA 0.2",
+  "version": "0.3.0",
+  "displayVersion": "BETA 0.3",
   "private": true,
   "description": "WebSocket relay server for E-Ride multiplayer (up to 6 riders per room).",
   "main": "server.js",

@@ -252,6 +252,15 @@ function inboxPane(game, filter, setFilter) {
 /* ---------------- roadmap ---------------- */
 const CHANGELOG = [
   {
+    v: 'BETA 0.3', when: 'Update 3 — Play with your friends',
+    lines: [
+      'Multiplayer no longer needs a server. One player hosts and gets a five-character code.',
+      'Join by code, or by an invite link that drops you straight into the room.',
+      'Peer-to-peer over WebRTC — no game traffic passes through anyone else.',
+      'Still up to 6 riders, still two to a bike.',
+    ],
+  },
+  {
     v: 'BETA 0.2', when: 'Update 2 — A city with something in it',
     lines: [
       'Traffic: cars and vans drive the road network, and they brake for you (mostly).',

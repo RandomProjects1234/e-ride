@@ -1,8 +1,8 @@
-# E-Ride — BETA 0.2
+# E-Ride — BETA 0.3
 
 [![play](https://img.shields.io/badge/play-randomprojects1234.github.io%2Fe--ride-39e6a4)](https://randomprojects1234.github.io/e-ride/)
 [![licence](https://img.shields.io/badge/licence-MIT-16c2ff)](LICENSE)
-[![version](https://img.shields.io/badge/version-BETA%200.2-a06bff)](#versions)
+[![version](https://img.shields.io/badge/version-BETA%200.3-a06bff)](#versions)
 
 **Play it: <https://randomprojects1234.github.io/e-ride/>**
 
@@ -28,16 +28,10 @@ python serve.py 3495
 Then open <http://localhost:3495>. Any static file server works — there is
 nothing to compile.
 
-**Multiplayer relay:**
+**Multiplayer:** nothing to run. Open the in-game **Multiplayer** panel, hit
+*Open a room*, and send your friends the five-character code.
 
-```bash
-cd server && npm install && npm start
-```
-
-Then open the in-game **Multiplayer** panel and point it at
-`ws://localhost:3496`. Up to 6 riders share a world.
-
-On Windows, `Start E-Ride.bat` starts both and opens the game.
+On Windows, `Start E-Ride.bat` starts the client and opens the game.
 
 ---
 
@@ -159,15 +153,30 @@ lowball offers.
 
 ## Multiplayer
 
-Up to six riders in a world, positions, wheelie angle and lean synced at 15 Hz
-with client-side interpolation. Two-seat frames can carry a passenger: pull
-alongside someone with a spare seat and press `E`. They drive, you ride along,
-and your own bike is stowed until you hop off. The pairing is owned by the
-server, so both clients always agree on who is carrying whom.
+**There is no server.** One player picks *Open a room* and gets a
+five-character code like `K7WQZ`; everyone else types it in, or opens the
+invite link. The connection is peer-to-peer over WebRTC — PeerJS's public
+broker is used only to introduce the two browsers to each other, and no game
+traffic passes through it.
 
-The relay is in `server/`. It is a plain `ws` server — no database, no state
-beyond who is in which room. Host it anywhere that gives you a `wss://` address
-and paste that into the Multiplayer panel.
+The host's browser runs the room itself (`src/net/room.js`): membership,
+colour assignment, the driver/passenger pairing and the 15 Hz state fan-out.
+That is the same room logic the old Node relay ran, lifted out and made
+transport-agnostic, so the protocol is unchanged and either transport can
+drive it.
+
+Up to six riders in a world, with positions, wheelie angle and lean synced at
+15 Hz and interpolated on the way in. Two-seat frames can carry a passenger:
+pull alongside someone with a spare seat and press `E`. They drive, you ride
+along, and your own bike is stowed until you hop off. The host owns the
+pairing, so both clients always agree on who is carrying whom.
+
+A client that loses track of a peer — a backgrounded tab stops rendering and
+times its peers out — re-announces itself and is sent the full picture again,
+so it recovers instead of staying blind.
+
+Keep the host's tab open: close it and the room goes with it. `server/` still
+holds the old WebSocket relay if you would rather run a dedicated one.
 
 ---
 
@@ -194,8 +203,8 @@ client) to a repo and turn Pages on. There is no build step. `three.js` loads
 from a pinned jsDelivr URL via an import map, so the only requirement is that
 the files are served over HTTP(S).
 
-If the page is served over HTTPS, the multiplayer server must be `wss://` —
-the game checks and tells the player so rather than failing silently.
+Multiplayer needs no extra setup on Pages — WebRTC works from an HTTPS origin,
+which is what Pages serves.
 
 ---
 
@@ -212,6 +221,7 @@ followed by 1.0.
 
 | | |
 | --- | --- |
+| **BETA 0.3** | multiplayer with no server — host a room, share a five-character code |
 | **BETA 0.2** | traffic, pedestrians, near misses, police pursuit, 120 collectible cells, boost gates, slow-mo on big air — and e-scooters can wheelie now |
 | **BETA 0.1** | first public build — the whole of Volta Bay, 13 machines, the parts system, jobs, tricks, multiplayer, the suggestion box |
 
