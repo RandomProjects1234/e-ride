@@ -1,0 +1,10 @@
+{
+  "name": "e-ride",
+  "version": "0.1.0",
+  "private": true,
+  "description": "E-Ride — a 3D e-bike/e-scooter open-world game. Static client (GitHub Pages) + Node relay server.",
+  "scripts": {
+    "start": "python serve.py 3495",
+    "server": "cd server && npm start"
+  }
+}

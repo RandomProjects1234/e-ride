@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0a0d14" />
+<meta name="description" content="E-Ride — ride e-bikes and e-scooters, pull wheelies, run quests, build and sell custom machines." />
+<title>E-Ride</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🛴</text></svg>" />
+<link rel="stylesheet" href="css/style.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+
+<!-- ============ LOADING ============ -->
+<div id="loading" class="screen">
+  <div class="logo">E&#8209;RIDE</div>
+  <div class="tagline">wheelie. earn. build. repeat.</div>
+  <div class="loadbar"><i id="loadfill"></i></div>
+  <div id="loadmsg" class="loadmsg">booting…</div>
+</div>
+
+<!-- ============ HUD ============ -->
+<div id="hud" class="hidden">
+  <div id="hud-top-left">
+    <div id="speedo">
+      <svg viewBox="0 0 120 120" id="speedo-svg">
+        <circle cx="60" cy="60" r="52" class="sp-track"/>
+        <circle cx="60" cy="60" r="52" class="sp-fill" id="sp-fill"/>
+      </svg>
+      <div class="sp-readout"><b id="sp-num">0</b><span id="sp-unit">mph</span></div>
+    </div>
+    <div id="batt-wrap" title="Battery">
+      <div class="batt"><i id="batt-fill"></i></div>
+      <span id="batt-pct">100%</span>
+    </div>
+  </div>
+
+  <div id="hud-top-right">
+    <div id="cash">$0</div>
+    <div id="vehname">—</div>
+    <div id="playercount" class="pill off">offline</div>
+  </div>
+
+  <div id="wheelie-hud" class="hidden">
+    <div class="wh-label">WHEELIE</div>
+    <div class="wh-bal"><i id="wh-marker"></i><b id="wh-zone"></b></div>
+    <div class="wh-stats"><span id="wh-time">0.0s</span><span id="wh-dist">0m</span></div>
+  </div>
+
+  <div id="combo" class="hidden"><b id="combo-mult">x1</b><span id="combo-pts">0</span></div>
+
+  <div id="toast-stack"></div>
+
+  <div id="quest-track" class="hidden">
+    <div class="qt-head"><span id="qt-title">Quest</span><em id="qt-reward"></em></div>
+    <div id="qt-desc"></div>
+    <div class="qt-bar"><i id="qt-fill"></i></div>
+  </div>
+
+  <div id="minimap-wrap">
+    <canvas id="minimap" width="220" height="220"></canvas>
+  </div>
+
+  <div id="prompt" class="hidden"><b></b></div>
+
+  <div id="passenger-badge" class="hidden">🧍 PASSENGER — <span>hold on!</span></div>
+</div>
+
+<!-- ============ TOUCH CONTROLS ============ -->
+<div id="touch" class="hidden">
+  <div id="stick" class="tzone"><i id="stick-knob"></i></div>
+  <div id="tbtns">
+    <button class="tbtn big" data-act="throttle">⚡</button>
+    <button class="tbtn" data-act="brake">◼</button>
+    <button class="tbtn wheelie" data-act="wheelie">WHEELIE</button>
+    <button class="tbtn small" data-act="interact">E</button>
+    <button class="tbtn small" data-act="camera">🎥</button>
+    <button class="tbtn small" data-act="reset">↺</button>
+  </div>
+</div>
+
+<!-- ============ MENUS ============ -->
+<div id="overlay" class="hidden"></div>
+<div id="menu-root"></div>
+
+<button id="pause-btn" class="hidden" title="Menu (Esc)">☰</button>
+
+<noscript><div class="screen"><div class="logo">E-RIDE</div><p>JavaScript is required.</p></div></noscript>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
