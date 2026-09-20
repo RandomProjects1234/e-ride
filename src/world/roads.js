@@ -3,6 +3,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { MeshBuilder, hexRGB } from './meshbuilder.js';
+import { asphaltTexture, asphaltNormal } from './textures.js';
 import { SURF } from './layout.js';
 
 const Y_ROAD = 0.09;
@@ -114,13 +115,23 @@ export function buildRoads(roadNet) {
   const group = new THREE.Group();
   group.name = 'roads';
 
-  const surfMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93, metalness: 0.02 });
+  /* Road UVs run 0..1 across the width and run/8 along, so a repeat of
+     (3.2, 2) lands roughly a 4 m texture tile in both directions. The
+     normal map is what stops tarmac reading as flat paint in sunlight. */
+  const aMap = asphaltTexture(); aMap.repeat.set(3.2, 2);
+  const aNrm = asphaltNormal(); aNrm.repeat.set(3.2, 2);
+  const surfMat = new THREE.MeshStandardMaterial({
+    vertexColors: true, roughness: 0.93, metalness: 0.02,
+    map: aMap, normalMap: aNrm,
+    normalScale: new THREE.Vector2(0.55, 0.55),
+    envMapIntensity: 0.30,
+  });
   const road = surfB.build(surfMat);
   road.receiveShadow = true;
   group.add(road);
 
   if (!markB.empty) {
-    const markMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 });
+    const markMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, envMapIntensity: 0.25 });
     group.add(markB.build(markMat));
   }
   if (!curbB.empty) {

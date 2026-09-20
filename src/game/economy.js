@@ -73,6 +73,17 @@ export class Economy {
 
   _migrate() {
     const d = this.data;
+
+    /* An early trailer-recorder build created vehicles named after the
+       preset id ("v-ultra") rather than the preset's actual name. Repair
+       those in place so existing saves stop showing an id in the HUD. */
+    for (const v of d.garage || []) {
+      if (typeof v.name === 'string' && /^v-[a-z0-9]+$/i.test(v.name)) {
+        const p = PRESET_BY_ID.get(v.name.toLowerCase());
+        if (p) v.name = p.name;
+      }
+    }
+    if (!Array.isArray(d.cells)) d.cells = [];
     d.records = Object.assign({
       distance: 0, topSpeedMs: 0, bestWheelieTime: 0, bestWheelieDist: 0,
       bestAir: 0, crashes: 0, earned: 0, spent: 0, tricksBanked: 0,

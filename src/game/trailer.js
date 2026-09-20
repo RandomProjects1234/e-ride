@@ -229,7 +229,7 @@ export class Trailer {
         const existing = economy.vehicles.find((v) => v.preset === shot.preset);
         if (existing) id = existing.id;
         else {
-          const p = PRESET_BY_ID[shot.preset];
+          const p = PRESET_BY_ID.get(shot.preset);
           const v = economy.addVehicle(p ? p.name : shot.preset, buildFromPreset(shot.preset), { preset: shot.preset });
           id = v.id;
         }

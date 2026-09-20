@@ -252,6 +252,18 @@ function inboxPane(game, filter, setFilter) {
 /* ---------------- roadmap ---------------- */
 const CHANGELOG = [
   {
+    v: 'BETA 0.4', when: 'Update 4 — It actually looks like a city',
+    lines: [
+      'Building facades: glass curtain walls, concrete, brick and corrugated steel, with real windows.',
+      'Sky environment map, so glass and paint reflect something instead of looking like matte card.',
+      'Textured asphalt with a normal map, and shadows about four times sharper.',
+      'Cars and vans rebuilt from swept profiles — sloped bonnets and raked screens, not stacked boxes.',
+      'Pedestrians are proper figures now, and the rider got shoulders, elbows, gloves, boots and a motocross helmet.',
+      'Fixed: you could ride straight through police cars.',
+      'Fixed: vehicles in old saves showing an internal id instead of a name.',
+    ],
+  },
+  {
     v: 'BETA 0.3', when: 'Update 3 — Play with your friends',
     lines: [
       'Multiplayer no longer needs a server. One player hosts and gets a five-character code.',

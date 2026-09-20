@@ -3,6 +3,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { settings } from './settings.js';
+import { skyEnvironment } from '../world/textures.js';
 import { clamp, damp } from './util.js';
 
 export const SKY = {
@@ -36,7 +37,7 @@ export class Engine {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, q === 'high' ? 2 : q === 'medium' ? 1.5 : 1));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.06;
+    this.renderer.toneMappingExposure = 0.92;
     this.renderer.shadowMap.enabled = settings.get('shadows') && q !== 'low';
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -87,16 +88,19 @@ export class Engine {
   }
 
   _lights() {
-    const hemi = new THREE.HemisphereLight(0xbcd9f5, 0x54503f, 1.15);
+    const hemi = new THREE.HemisphereLight(0xbcd9f5, 0x54503f, 0.38);
     this.scene.add(hemi);
     this.hemi = hemi;
 
-    const sun = new THREE.DirectionalLight(0xfff3dd, 2.15);
+    const sun = new THREE.DirectionalLight(0xfff6e2, 1.95);
     sun.position.set(-230, 340, 180);
     sun.castShadow = true;
-    const S = this.quality === 'high' ? 2048 : 1024;
+    const S = this.quality === 'high' ? 4096 : this.quality === 'medium' ? 2048 : 1024;
     sun.shadow.mapSize.set(S, S);
-    const d = 130;
+    // a tighter frustum over the same map size is what actually makes
+    // shadows crisp — 130 m of coverage was spending most of the texels
+    // on ground the player never looks at
+    const d = this.quality === 'low' ? 110 : 85;
     sun.shadow.camera.left = -d; sun.shadow.camera.right = d;
     sun.shadow.camera.top = d; sun.shadow.camera.bottom = -d;
     sun.shadow.camera.near = 1; sun.shadow.camera.far = 720;
@@ -107,9 +111,19 @@ export class Engine {
     this.sun = sun;
 
     // gentle fill from the opposite side so dark sides aren't flat
-    const fill = new THREE.DirectionalLight(0x9fc6ff, 0.34);
+    const fill = new THREE.DirectionalLight(0x9fc6ff, 0.20);
     fill.position.set(200, 120, -180);
     this.scene.add(fill);
+
+    /* A filtered sky as the environment map. Without one, every metal and
+       glass surface has nothing to reflect and reads as flat paint — this
+       is most of the difference between "untextured boxes" and a city. */
+    try {
+      this.scene.environment = skyEnvironment(this.renderer, sun.position.clone().normalize());
+      this.scene.environmentIntensity = 0.55;
+    } catch (e) {
+      console.warn('[engine] no environment map:', e.message);
+    }
   }
 
   /** keep the shadow frustum around the player */

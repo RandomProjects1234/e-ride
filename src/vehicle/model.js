@@ -73,9 +73,11 @@ const MATS = {
   motor:  new THREE.MeshStandardMaterial({ color: 0x4d5560, roughness: 0.34, metalness: 0.9 }),
   batt:   new THREE.MeshStandardMaterial({ color: 0x2b303a, roughness: 0.5, metalness: 0.3 }),
   skin:   new THREE.MeshStandardMaterial({ color: 0xc98e6d, roughness: 0.82 }),
-  helmet: new THREE.MeshStandardMaterial({ color: 0xe8413f, roughness: 0.3, metalness: 0.2 }),
-  visor:  new THREE.MeshStandardMaterial({ color: 0x1a2030, roughness: 0.1, metalness: 0.7 }),
+  helmet: new THREE.MeshStandardMaterial({ color: 0xe8413f, roughness: 0.16, metalness: 0.25, envMapIntensity: 1.3 }),
+  visor:  new THREE.MeshStandardMaterial({ color: 0x141a28, roughness: 0.06, metalness: 0.85, envMapIntensity: 1.8 }),
   cloth:  new THREE.MeshStandardMaterial({ color: 0x2f3a52, roughness: 0.92 }),
+  boot:   new THREE.MeshStandardMaterial({ color: 0x191d26, roughness: 0.55, metalness: 0.1 }),
+  glove:  new THREE.MeshStandardMaterial({ color: 0x23293a, roughness: 0.7 }),
   cloth2: new THREE.MeshStandardMaterial({ color: 0x5a3f6b, roughness: 0.92 }),
   light:  new THREE.MeshStandardMaterial({ color: 0xfff0c0, emissive: 0xffe08a, emissiveIntensity: 1.4, roughness: 0.3 }),
   tail:   new THREE.MeshStandardMaterial({ color: 0xff3344, emissive: 0xff2233, emissiveIntensity: 1.1, roughness: 0.3 }),
@@ -123,52 +125,92 @@ function buildRider(standing, cloth) {
   const body = [];
   const h = standing ? 1.0 : 0.86;
 
-  // torso
-  body.push(cyl(0, h * 0.62, 0, 0.16, 0.19, h * 0.48, 8, [standing ? -0.18 : -0.42, 0, 0]));
+  /* Torso is a tapered trunk plus a separate shoulder mass. The shoulders
+     are what stop a rider reading as a bottle with limbs — they give the
+     silhouette the wide-top, narrow-waist shape the eye expects. */
+  body.push(cyl(0, h * 0.60, 0, 0.155, 0.20, h * 0.44, 10, [standing ? -0.18 : -0.42, 0, 0]));
+  // chest / shoulder yoke
+  const yoke = sphere(0, h * 0.82, standing ? 0.01 : 0.055, 0.20, 10);
+  yoke.scale(1.42, 0.78, 0.95);
+  body.push(yoke);
   // hips
-  body.push(sphere(0, h * 0.36, standing ? -0.02 : -0.06, 0.16, 8));
+  const hip = sphere(0, h * 0.36, standing ? -0.02 : -0.06, 0.165, 9);
+  hip.scale(1.15, 0.85, 1.0);
+  body.push(hip);
   const torso = meshOf(body, cloth);
   if (torso) g.add(torso);
 
-  // legs
+  // legs — thigh, knee, shin, boot
   const legs = [];
-  for (const s of [-1, 1]) {
+  const boots = [];
+  for (const sd of [-1, 1]) {
     if (standing) {
-      legs.push(tube(s * 0.11, h * 0.34, -0.02, s * 0.12, 0.30, 0.02, 0.065, 6));
-      legs.push(tube(s * 0.12, 0.30, 0.02, s * 0.12, 0.04, 0.05, 0.055, 6));
+      legs.push(tube(sd * 0.11, h * 0.34, -0.02, sd * 0.12, 0.30, 0.02, 0.075, 7));
+      legs.push(sphere(sd * 0.12, 0.30, 0.02, 0.068, 7));
+      legs.push(tube(sd * 0.12, 0.30, 0.02, sd * 0.12, 0.05, 0.05, 0.058, 7));
     } else {
-      legs.push(tube(s * 0.11, h * 0.34, -0.06, s * 0.15, 0.36, 0.22, 0.07, 6));
-      legs.push(tube(s * 0.15, 0.36, 0.22, s * 0.14, 0.10, 0.30, 0.055, 6));
+      legs.push(tube(sd * 0.11, h * 0.34, -0.06, sd * 0.155, 0.36, 0.22, 0.082, 7));
+      legs.push(sphere(sd * 0.155, 0.36, 0.22, 0.072, 7));      // knee
+      legs.push(tube(sd * 0.155, 0.36, 0.22, sd * 0.145, 0.11, 0.30, 0.058, 7));
     }
-    legs.push(box(s * 0.14, 0.03, standing ? 0.07 : 0.33, 0.09, 0.05, 0.22));
+    // boot: sole plus ankle, not a single brick
+    const bz = standing ? 0.07 : 0.33;
+    boots.push(box(sd * 0.145, 0.055, bz, 0.105, 0.085, 0.20));
+    boots.push(box(sd * 0.145, 0.018, bz + 0.03, 0.115, 0.035, 0.25));
   }
   const legMesh = meshOf(legs, MATS.cloth);
   if (legMesh) g.add(legMesh);
+  const bootMesh = meshOf(boots, MATS.boot || MATS.cloth);
+  if (bootMesh) g.add(bootMesh);
 
-  // arms — animated toward the bars
+  // arms — upper, elbow, forearm, glove, animated toward the bars
   const armL = new THREE.Group(), armR = new THREE.Group();
-  for (const [grp, s] of [[armL, 1], [armR, -1]]) {
-    grp.position.set(s * 0.17, h * 0.80, 0.02);
+  for (const [grp, sd] of [[armL, 1], [armR, -1]]) {
+    grp.position.set(sd * 0.185, h * 0.80, 0.02);
     const a = meshOf([
-      tube(0, 0, 0, s * 0.03, -0.14, 0.24, 0.055, 6),
-      tube(s * 0.03, -0.14, 0.24, s * 0.02, -0.20, 0.50, 0.048, 6),
+      tube(0, 0, 0, sd * 0.045, -0.14, 0.23, 0.062, 7),
+      sphere(sd * 0.045, -0.14, 0.23, 0.058, 7),                // elbow
+      tube(sd * 0.045, -0.14, 0.23, sd * 0.025, -0.20, 0.49, 0.050, 7),
     ], cloth);
     if (a) grp.add(a);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 5), MATS.skin);
-    hand.position.set(s * 0.02, -0.21, 0.53);
-    grp.add(hand);
+    const glove = new THREE.Mesh(new THREE.SphereGeometry(0.058, 8, 6), MATS.glove || MATS.skin);
+    glove.scale.set(1.0, 0.85, 1.25);
+    glove.position.set(sd * 0.022, -0.212, 0.535);
+    glove.castShadow = true;
+    grp.add(glove);
     g.add(grp);
   }
 
-  // head + helmet
+  /* Head: a motocross lid — skull, chin bar, peak and a wrap-around visor.
+     The peak and chin bar are most of what makes it read as a helmet
+     rather than a ball. */
   const head = new THREE.Group();
-  head.position.set(0, h * 0.96, standing ? 0.04 : 0.02);
-  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.125, 10, 8), MATS.helmet);
+  head.position.set(0, h * 0.99, standing ? 0.04 : 0.02);
+
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.128, 14, 11), MATS.helmet);
+  skull.scale.set(1.0, 1.06, 1.08);
   skull.castShadow = true;
   head.add(skull);
-  const visor = new THREE.Mesh(new THREE.SphereGeometry(0.126, 10, 8, 0, Math.PI, 0.9, 0.7), MATS.visor);
+
+  // chin bar sweeping round the jaw
+  const chin = new THREE.Mesh(new THREE.TorusGeometry(0.098, 0.040, 6, 12, Math.PI * 1.05), MATS.helmet);
+  chin.rotation.set(Math.PI / 2, 0, Math.PI * 0.475);
+  chin.position.set(0, -0.052, 0.030);
+  head.add(chin);
+
+  // peak
+  const peak = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.018, 0.115), MATS.helmet);
+  peak.position.set(0, 0.072, 0.128);
+  peak.rotation.x = -0.30;
+  head.add(peak);
+
+  // visor aperture
+  const visor = new THREE.Mesh(
+    new THREE.SphereGeometry(0.131, 14, 10, Math.PI * 0.30, Math.PI * 0.40, Math.PI * 0.40, Math.PI * 0.30),
+    MATS.visor);
   visor.rotation.y = -Math.PI / 2;
   head.add(visor);
+
   g.add(head);
 
   g.userData = { armL, armR, head, standing };

@@ -15,10 +15,10 @@ const C = {
   grassB: [0.34, 0.45, 0.20],
   grassDry: [0.45, 0.45, 0.24],
   dirt: [0.40, 0.29, 0.18],
-  sand: [0.74, 0.67, 0.47],
+  sand: [0.62, 0.56, 0.40],
   rock: [0.35, 0.34, 0.33],
-  concrete: [0.42, 0.43, 0.45],
-  asphalt: [0.15, 0.16, 0.18],
+  concrete: [0.315, 0.312, 0.300],
+  asphalt: [0.115, 0.122, 0.138],
   wood: [0.40, 0.29, 0.19],
   seabed: [0.20, 0.25, 0.26],
 };
@@ -44,7 +44,14 @@ function surfColor(surf, x, z, y, slope, out) {
   }
   // steep ground shows rock
   const rk = clamp((slope - 0.42) / 0.36, 0, 1);
-  const n = 0.9 + fbm(x / 13, z / 13, 2, 19) * 0.22;
+  /* Paved ground needs more break-up than grass does: a single flat tone
+     over a whole district is what makes it read as untextured. Two octaves
+     at different scales give slab-sized patches plus fine grain. */
+  const paved = surf === SURF.CONCRETE || surf === SURF.ASPHALT;
+  let n = 0.9 + fbm(x / 13, z / 13, 2, 19) * 0.22;
+  if (paved) {
+    n = 0.84 + fbm(x / 7.5, z / 7.5, 2, 19) * 0.20 + fbm(x / 34, z / 34, 2, 41) * 0.20;
+  }
   out[0] = lerp(c[0], C.rock[0], rk) * n;
   out[1] = lerp(c[1], C.rock[1], rk) * n;
   out[2] = lerp(c[2], C.rock[2], rk) * n;
@@ -55,6 +62,7 @@ export function buildTerrain(hf) {
   group.name = 'terrain';
   const material = new THREE.MeshStandardMaterial({
     vertexColors: true, roughness: 0.96, metalness: 0.0,
+    envMapIntensity: 0.28,   // ground should not mirror the sky
   });
 
   const tmp = [0, 0, 0];

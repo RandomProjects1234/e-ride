@@ -609,9 +609,18 @@ class Game {
   /** riding into a car is exactly as good an idea as it sounds */
   handleTrafficHit(b) {
     if (b.crashed || !this.traffic.enabled) return;
-    const car = this.traffic.hitTest(b.pos.x, b.pos.z, 0.5);
+    const car = this.traffic.hitTest(b.pos.x, b.pos.z, 0.5, this.police);
     if (!car) return;
     const mph = Math.abs(b.speed) * MS_TO_MPH;
+    if (car.isCop) {
+      // ramming a patrol car is a very fast route to being arrested
+      this.police.addHeat(1.1);
+      b.crash('Hit a patrol car');
+      this.fx.crashBurst(b.pos);
+      this.cam.addShake(1.3);
+      this.police.caughtT = 1.4;
+      return;
+    }
     this.police.addHeat(0.55);
     if (mph > 16) {
       b.crash('Hit a car');

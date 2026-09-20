@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshBuilder, hexRGB } from './meshbuilder.js';
 import { WORLD, DISTRICTS, SURF } from './layout.js';
+import { facadeTexture, facadeRoughness } from './textures.js';
 import { makeRng, clamp, lerp } from '../core/util.js';
 
 /* ---------------- shared small geometries ---------------- */
@@ -137,12 +138,25 @@ export function buildProps(world) {
   /* ================= BUILDINGS ================= */
   const bld = new MeshBuilder();
 
+  /* One MeshBuilder per facade style: each style needs its own texture,
+     and a texture per material means a mesh per material. Four extra draw
+     calls buys windows on every building in the city. */
+  const facadeBld = {
+    'tower:0': new MeshBuilder(), 'tower:1': new MeshBuilder(),
+    'tower:2': new MeshBuilder(), 'tower:3': new MeshBuilder(),
+    'block:0': new MeshBuilder(), 'ware:0': new MeshBuilder(), 'house:0': new MeshBuilder(),
+  };
+
   function building(x, z, w, d, h, style, yaw = 0) {
+    const fStyle = style === 'hut' ? 'house' : style;
+    // towers come in four glazing tints so downtown is not one navy monolith
+    const fVar = fStyle === 'tower' ? Math.floor(rng() * 4) : 0;
+    const fb = facadeBld[`${fStyle}:${fVar}`] || facadeBld['block:0'];
     const y0 = world.hf.height(x, z);
     const palettes = {
-      tower:  [0x4c5b70, 0x55647a, 0x3f4c5f, 0x5d6b80, 0x475467],
-      block:  [0x6f6256, 0x7a6d5f, 0x655a50, 0x83766a],
-      ware:   [0x767d85, 0x6a7079, 0x818790],
+      tower:  [0xb9c4d2, 0xa8b6c6, 0xc8d0da, 0x94a3b5, 0xd2d8de, 0x8fa0b4],
+      block:  [0xc4bbac, 0xd3cabb, 0xb0a596, 0xded6c6, 0xa89d8d],
+      ware:   [0x9aa1a9, 0x8d949c, 0xa7aeb6],
       house:  [0xb0a191, 0xc2b3a1, 0x9d8f80, 0xa8b0a2, 0xc9bda8],
       hut:    [0xd8c6a6, 0xc9b28c, 0xe0d2b8],
     };
@@ -155,34 +169,30 @@ export function buildProps(world) {
     const hw = w / 2, hd = d / 2;
     const corners = [rot(-hw, -hd), rot(hw, -hd), rot(hw, hd), rot(-hw, hd)];
     const top = y0 + h;
-    // walls
+    /* Walls are UV'd in units of bays across and floors up, so the facade
+       texture lands at a believable scale whatever size the building is.
+       The vertex colour still tints it, which is what keeps every tower
+       from looking like the same tower. */
+    const floorH = style === 'house' || style === 'hut' ? 3.0 : style === 'ware' ? 4.6 : 3.6;
+    const bayW = style === 'ware' ? 6.0 : 3.4;
+    const floors = Math.max(1, Math.round(h / floorH));
+    const tint = 0.80 + rng() * 0.34;
     for (let i = 0; i < 4; i++) {
       const a = corners[i], b = corners[(i + 1) % 4];
       const nx = -(b[1] - a[1]), nz = (b[0] - a[0]);
       const nl = Math.hypot(nx, nz) || 1;
-      const shade = 0.72 + 0.28 * Math.abs(nx / nl);
+      const side = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const bays = Math.max(1, Math.round(side / bayW));
+      const shade = (0.80 + 0.20 * Math.abs(nx / nl)) * tint;
       const r0 = base[0] * shade, g0 = base[1] * shade, b0 = base[2] * shade;
-      const v0 = bld.vert(a[0], y0 - 1, a[1], nx / nl, 0, nz / nl, r0, g0, b0, 0, 0);
-      const v1 = bld.vert(b[0], y0 - 1, b[1], nx / nl, 0, nz / nl, r0, g0, b0, 1, 0);
-      const v2 = bld.vert(b[0], top, b[1], nx / nl, 0, nz / nl, r0 * 1.04, g0 * 1.04, b0 * 1.04, 1, 1);
-      const v3 = bld.vert(a[0], top, a[1], nx / nl, 0, nz / nl, r0 * 1.04, g0 * 1.04, b0 * 1.04, 0, 1);
-      bld.quad(v0, v1, v2, v3);
-      // window bands on tall buildings
-      if (style === 'tower' && h > 16) {
-        const floors = Math.floor(h / 4);
-        for (let f = 1; f < floors; f++) {
-          const wy = y0 + f * 4 + 1.1;
-          const inset = 0.06;
-          const ax = a[0] + (nx / nl) * inset, az = a[1] + (nz / nl) * inset;
-          const bx = b[0] + (nx / nl) * inset, bz = b[1] + (nz / nl) * inset;
-          const gl = 0.10 + rng() * 0.16;
-          const w0 = bld.vert(ax, wy, az, nx / nl, 0, nz / nl, gl, gl * 1.25, gl * 1.5);
-          const w1 = bld.vert(bx, wy, bz, nx / nl, 0, nz / nl, gl, gl * 1.25, gl * 1.5);
-          const w2 = bld.vert(bx, wy + 1.7, bz, nx / nl, 0, nz / nl, gl * 1.3, gl * 1.5, gl * 1.8);
-          const w3 = bld.vert(ax, wy + 1.7, az, nx / nl, 0, nz / nl, gl * 1.3, gl * 1.5, gl * 1.8);
-          bld.quad(w0, w1, w2, w3);
-        }
-      }
+      // a little ambient occlusion at street level, which is most of what
+      // makes a building look planted rather than floating
+      const ao = 0.55;
+      const v0 = fb.vert(a[0], y0 - 1, a[1], nx / nl, 0, nz / nl, r0 * ao, g0 * ao, b0 * ao, 0, 0);
+      const v1 = fb.vert(b[0], y0 - 1, b[1], nx / nl, 0, nz / nl, r0 * ao, g0 * ao, b0 * ao, bays, 0);
+      const v2 = fb.vert(b[0], top, b[1], nx / nl, 0, nz / nl, r0 * 1.06, g0 * 1.06, b0 * 1.06, bays, floors);
+      const v3 = fb.vert(a[0], top, a[1], nx / nl, 0, nz / nl, r0 * 1.06, g0 * 1.06, b0 * 1.06, 0, floors);
+      fb.quad(v0, v1, v2, v3);
     }
     // roof
     const rc = style === 'tower' ? 0.34 : 0.4;
@@ -191,6 +201,22 @@ export function buildProps(world) {
     const t2 = bld.vert(corners[2][0], top, corners[2][1], 0, 1, 0, base[0] * rc, base[1] * rc, base[2] * rc);
     const t3 = bld.vert(corners[3][0], top, corners[3][1], 0, 1, 0, base[0] * rc, base[1] * rc, base[2] * rc);
     bld.quad(t0, t1, t2, t3);
+
+    // parapet, so a roof is not just a flat lid
+    if (style === 'tower' || style === 'block') {
+      const ph = 0.9;
+      for (let i = 0; i < 4; i++) {
+        const a = corners[i], b = corners[(i + 1) % 4];
+        const nx = -(b[1] - a[1]), nz = (b[0] - a[0]);
+        const nl = Math.hypot(nx, nz) || 1;
+        const cc2 = [base[0] * 0.5, base[1] * 0.5, base[2] * 0.5];
+        const q0 = bld.vert(a[0], top, a[1], nx / nl, 0, nz / nl, cc2[0], cc2[1], cc2[2]);
+        const q1 = bld.vert(b[0], top, b[1], nx / nl, 0, nz / nl, cc2[0], cc2[1], cc2[2]);
+        const q2 = bld.vert(b[0], top + ph, b[1], nx / nl, 0, nz / nl, cc2[0] * 1.3, cc2[1] * 1.3, cc2[2] * 1.3);
+        const q3 = bld.vert(a[0], top + ph, a[1], nx / nl, 0, nz / nl, cc2[0] * 1.3, cc2[1] * 1.3, cc2[2] * 1.3);
+        bld.quad(q0, q1, q2, q3);
+      }
+    }
 
     // rooftop clutter
     if (style === 'tower' && rng() < 0.7) {
@@ -259,10 +285,36 @@ export function buildProps(world) {
     building(x, z, 5 + rng() * 3, 4 + rng() * 3, 3 + rng() * 1.6, 'hut', rng() * Math.PI);
   }
 
+  // roofs, parapets and pitched caps: untextured, vertex-coloured
   const bMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0.04, side: THREE.DoubleSide });
   const bMesh = bld.build(bMat);
   bMesh.castShadow = true; bMesh.receiveShadow = true;
   group.add(bMesh);
+
+  // one textured mesh per facade style
+  const FACADE_MAT = {
+    tower: { rough: 0.30, metal: 0.20, env: 1.35 },
+    block: { rough: 0.86, metal: 0.03, env: 0.45 },
+    ware:  { rough: 0.58, metal: 0.32, env: 0.75 },
+    house: { rough: 0.92, metal: 0.02, env: 0.35 },
+  };
+  for (const key of Object.keys(facadeBld)) {
+    const b2 = facadeBld[key];
+    if (!b2.v) continue;
+    const [style, variant] = key.split(':');
+    const cfg = FACADE_MAT[style];
+    const mat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      map: facadeTexture(style, +variant),
+      roughnessMap: facadeRoughness(style),
+      roughness: cfg.rough,
+      metalness: cfg.metal,
+      envMapIntensity: cfg.env,
+    });
+    const m = b2.build(mat);
+    m.castShadow = true; m.receiveShadow = true;
+    group.add(m);
+  }
 
   /* ================= INSTANCED SCATTER ================= */
   const instMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0.02 });

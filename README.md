@@ -1,8 +1,8 @@
-# E-Ride — BETA 0.3
+# E-Ride — BETA 0.4
 
 [![play](https://img.shields.io/badge/play-randomprojects1234.github.io%2Fe--ride-39e6a4)](https://randomprojects1234.github.io/e-ride/)
 [![licence](https://img.shields.io/badge/licence-MIT-16c2ff)](LICENSE)
-[![version](https://img.shields.io/badge/version-BETA%200.3-a06bff)](#versions)
+[![version](https://img.shields.io/badge/version-BETA%200.4-a06bff)](#versions)
 
 **Play it: <https://randomprojects1234.github.io/e-ride/>**
 
@@ -221,6 +221,7 @@ followed by 1.0.
 
 | | |
 | --- | --- |
+| **BETA 0.4** | a graphics pass — textured facades, environment reflections, rebuilt vehicle and character models |
 | **BETA 0.3** | multiplayer with no server — host a room, share a five-character code |
 | **BETA 0.2** | traffic, pedestrians, near misses, police pursuit, 120 collectible cells, boost gates, slow-mo on big air — and e-scooters can wheelie now |
 | **BETA 0.1** | first public build — the whole of Volta Bay, 13 machines, the parts system, jobs, tricks, multiplayer, the suggestion box |
@@ -252,6 +253,29 @@ serve.py    dev server + capture/feedback endpoints
 ```
 
 Nothing is generated or minified — every file in `src/` is the source.
+
+---
+
+## Graphics
+
+Everything is generated at boot — there are no downloaded assets, no texture
+files and nothing to 404, which is what keeps the game a folder of files you
+can drop on a static host.
+
+- **Facades** are canvas-drawn and tileable, one tile per floor by one bay
+  wide. Walls are UV'd in units of bays and floors, so the texture lands at a
+  believable scale whatever size the building is. Four glazing tints, plus
+  concrete, brick and corrugated steel, each its own mesh and material.
+- **The environment map** is a PMREM-filtered sky built from the same gradient
+  the sky uses, with the sun placed from the actual light direction. Without
+  one, every metal and glass surface has nothing to reflect and reads as flat
+  paint — it is most of the difference between "untextured boxes" and a city.
+- **Vehicles** are swept profiles rather than stacked boxes: a profile is
+  extruded along a set of sections so the silhouette gets a sloped bonnet, a
+  raked screen and a tapered tail.
+- **Shadows** use a 85 m frustum instead of 130 m over the same map size,
+  which is what actually makes them crisp — the wider frustum was spending
+  most of its texels on ground the player never looks at.
 
 ---
 
