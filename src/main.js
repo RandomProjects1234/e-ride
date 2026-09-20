@@ -95,7 +95,7 @@ class Game {
         Ride e&#8209;bikes and e&#8209;scooters around Volta Bay. Pull wheelies, run courier jobs and
         ride out with other players to earn cash — then build, tune and sell machines
         from a catalogue that runs from a 250&nbsp;W commuter hub all the way to a
-        600&nbsp;kW reactor-fed shaft drive.`));
+        900&nbsp;kW reactor-fed shaft drive.`));
       const b = el('div', 'home-btns');
       b.appendChild(btn('Pick your first ride', 'primary', () => this.pickStarter()));
       body.appendChild(b);
