@@ -90,6 +90,13 @@ class AudioEngine {
   updateMotor({ speed = 0, throttle = 0, maxSpeed = 30, grounded = true, active = true }) {
     if (!this.ready || !this.motor) return;
     const t = this.ctx.currentTime;
+    /* An invalid build (missing part, incompatible tyre) computes NaN stats,
+       and a NaN reaching setTargetAtTime throws and takes the whole frame
+       with it. Sanitise here: the audio layer should never be the thing
+       that crashes the game. */
+    if (!Number.isFinite(speed)) speed = 0;
+    if (!Number.isFinite(throttle)) throttle = 0;
+    if (!Number.isFinite(maxSpeed) || maxSpeed <= 0) maxSpeed = 30;
     const sp = clamp(speed / Math.max(8, maxSpeed), 0, 1.4);
     const base = 42 + sp * 560 + throttle * 34;
     this.motor.o1.frequency.setTargetAtTime(base, t, 0.06);

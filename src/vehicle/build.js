@@ -317,7 +317,10 @@ export function stats(build, opts = {}) {
   const pCruise = (0.5 * RHO * cdA(P) * vCruise ** 3 + (P.tires?.roll ?? 0.012) * mass * G * vCruise)
                   / ((P.motor?.eff ?? 0.8) * (P.controller?.eff ?? 0.9));
   // 0.72 accounts for stopping, starting, hills and generally not cruising
-  const rangeKm = selfFuelled ? Infinity : (pCruise > 1 ? (wh / pCruise) * vCruise * 3.6 * 0.72 : 0);
+  /* Infinity is honest for a reactor but it leaks into every UI that does
+     arithmetic on range — a progress bar, a sort, a rounded label — and
+     shows up as NaN. Keep the flag, give the number a finite stand-in. */
+  const rangeKm = selfFuelled ? 99999 : (pCruise > 1 ? (wh / pCruise) * vCruise * 3.6 * 0.72 : 0);
 
   /* --- handling / stability / wheelie --- */
   const stiff = frame ? frame.stiffness : 0.5;
@@ -361,6 +364,7 @@ export function stats(build, opts = {}) {
     validation: v,
     parts: P,
     cls: frame ? frame.cls : 'bike',
+    realModel: frame ? frame.realModel || null : null,
     style: frame ? frame.style : 'bmx',
     seats: frame ? frame.seats : 1,
 

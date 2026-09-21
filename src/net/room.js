@@ -86,7 +86,8 @@ export class Room {
 
   /** a transport reports a new connection */
   add(id) {
-    if (this.players.has(id)) return this.players.get(id);
+    const had = this.players.get(id);
+    if (had) { had.lastSeen = Date.now(); return had; }
     if (this.players.size >= MAX_PLAYERS) {
       this.deliver(id, { t: 'full' });
       return null;
@@ -216,8 +217,24 @@ export class Room {
     }
   }
 
+  /* A peer can open a data channel and then never send a hello — a tab
+     closed mid-handshake, a reconnect that replaced itself, a connection
+     that half-opened. Those members sat in the room forever holding one
+     of the six slots and showing as "Rider" at the origin. */
+  _reap() {
+    const now = Date.now();
+    for (const [id, p] of this.players) {
+      if (id === 'host') continue;
+      const idle = now - p.lastSeen;
+      if (!p.joined && idle > 12000) { this.remove(id); continue; }
+      if (p.joined && idle > 25000) this.remove(id);
+    }
+  }
+
   /** batched state fan-out, driven by the host's game loop */
   tick(dt) {
+    this._reapAcc = (this._reapAcc || 0) + dt;
+    if (this._reapAcc > 2) { this._reapAcc = 0; this._reap(); }
     this._acc += dt;
     if (this._acc < 1 / STATE_HZ) return;
     this._acc = 0;

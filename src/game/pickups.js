@@ -106,6 +106,11 @@ export class Pickups {
     }
   }
 
+  /** adopt a saved collection (the save can arrive after construction) */
+  setTaken(ids) {
+    this.taken = new Set(Array.isArray(ids) ? ids : []);
+  }
+
   get collected() { return this.taken.size; }
   get total() { return this.cells.length; }
 

@@ -12,11 +12,18 @@
 import * as THREE from 'three';
 import { clamp, damp, lerp } from '../core/util.js';
 
-const CAR_BUDGET = 26;          // live cars around the player
-const PED_BUDGET = 22;
-const SPAWN_MIN = 55;           // don't pop in right on top of the player
-const SPAWN_MAX = 190;
-const DESPAWN = 250;
+const CAR_BUDGET = 30;          // live cars around the player
+const PED_BUDGET = 24;
+/* Traffic used to appear and vanish in plain sight: it spawned as close as
+   55 m — well inside the view — and was culled at 250 m, which is still on
+   screen on a clear day. Now nothing is created or destroyed inside the
+   camera's field of view unless it is far beyond the fog, so cars arrive
+   from behind you or from around a corner and leave the same way. */
+const SPAWN_MIN = 90;
+const SPAWN_MAX = 230;
+const DESPAWN = 330;            // fog closes in well before this
+const HARD_DESPAWN = 420;       // beyond this, go regardless of view
+const FOV_COS = Math.cos(0.95); // ~54 deg half-angle: a generous "on screen"
 
 const CAR_COLORS = [
   0xd6dbe4, 0x2c3340, 0x8f2b33, 0x1f4f7a, 0x2f6b4f, 0xc8862a,
@@ -239,6 +246,7 @@ export class Traffic {
     this.walkRoads = world.roadNet.roads.filter(
       (r) => (r.type === 'street' || r.type === 'lane' || r.type === 'boardwalk') && r.pts.length > 10);
 
+    this._indexSpawnPoints();
     this._buildMeshes();
     this._m = new THREE.Matrix4();
     this._q = new THREE.Quaternion();
@@ -277,19 +285,72 @@ export class Traffic {
   }
 
   /* ---------------- spawning ---------------- */
-  _pickRoadPoint(roads, px, pz) {
-    for (let tries = 0; tries < 24; tries++) {
-      const r = roads[(Math.random() * roads.length) | 0];
-      const i = 2 + ((Math.random() * (r.pts.length - 4)) | 0);
-      const d = Math.hypot(r.pts[i][0] - px, r.pts[i][1] - pz);
+
+  /* Picking a random road and a random index along it, then rejecting
+     anything outside the spawn band, works fine downtown and barely ever
+     succeeds out at the edges of the map where roads are sparse — so
+     traffic thinned out exactly where it was already thin. Index the
+     points into a grid once and sample only the cells that can contain a
+     hit. */
+  _indexSpawnPoints() {
+    this.spawnCell = 64;
+    this.driveGrid = new Map();
+    this.walkGrid = new Map();
+    const add = (grid, roads) => {
+      for (const r of roads) {
+        for (let i = 2; i < r.pts.length - 2; i++) {
+          const k = Math.floor(r.pts[i][0] / this.spawnCell) * 10007 + Math.floor(r.pts[i][1] / this.spawnCell);
+          let a = grid.get(k); if (!a) { a = []; grid.set(k, a); }
+          a.push([r, i]);
+        }
+      }
+    };
+    add(this.driveGrid, this.driveRoads);
+    add(this.walkGrid, this.walkRoads);
+  }
+
+  /** is (x,z) inside the camera's rough forward cone? */
+  _onScreen(x, z) {
+    const c = this._camPos, f = this._camFwd;
+    if (!c || !f) return false;
+    const dx = x - c.x, dz = z - c.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 1) return true;
+    return (dx * f.x + dz * f.z) / d > FOV_COS;
+  }
+
+  _pickRoadPoint(grid, px, pz, avoidView) {
+    const cell = this.spawnCell;
+    const span = Math.ceil(SPAWN_MAX / cell);
+    const cx = Math.floor(px / cell), cz = Math.floor(pz / cell);
+    const hits = [];
+    for (let ox = -span; ox <= span; ox++) {
+      for (let oz = -span; oz <= span; oz++) {
+        // cheap reject: the whole cell is outside the band
+        const near = Math.hypot(Math.max(0, Math.abs(ox) - 1) * cell, Math.max(0, Math.abs(oz) - 1) * cell);
+        const far = Math.hypot((Math.abs(ox) + 1) * cell, (Math.abs(oz) + 1) * cell);
+        if (near > SPAWN_MAX || far < SPAWN_MIN) continue;
+        const arr = grid.get((cx + ox) * 10007 + (cz + oz));
+        if (arr) hits.push(arr);
+      }
+    }
+    if (!hits.length) return null;
+    // sample a handful of real candidates rather than hoping to hit one
+    for (let tries = 0; tries < 28; tries++) {
+      const bucket = hits[(Math.random() * hits.length) | 0];
+      const [r, i] = bucket[(Math.random() * bucket.length) | 0];
+      const x = r.pts[i][0], z = r.pts[i][1];
+      const d = Math.hypot(x - px, z - pz);
       if (d < SPAWN_MIN || d > SPAWN_MAX) continue;
+      // don't materialise in front of somebody who is looking that way
+      if (avoidView && this._onScreen(x, z)) continue;
       return { road: r, i };
     }
     return null;
   }
 
   _spawnCar(px, pz) {
-    const pick = this._pickRoadPoint(this.driveRoads, px, pz);
+    const pick = this._pickRoadPoint(this.driveGrid, px, pz, true);
     if (!pick) return null;
     const { road, i } = pick;
     const dir = Math.random() < 0.5 ? 1 : -1;
@@ -313,7 +374,7 @@ export class Traffic {
   }
 
   _spawnPed(px, pz) {
-    const pick = this._pickRoadPoint(this.walkRoads, px, pz);
+    const pick = this._pickRoadPoint(this.walkGrid, px, pz, true);
     if (!pick) return null;
     const { road, i } = pick;
     const p = {
@@ -359,9 +420,14 @@ export class Traffic {
   }
 
   /* ---------------- per frame ---------------- */
-  update(dt, player, police) {
+  update(dt, player, police, camera) {
     if (!this.enabled) return;
     const px = player.pos.x, pz = player.pos.z;
+    if (camera) {
+      this._camPos = camera.position;
+      if (!this._camFwd) this._camFwd = new THREE.Vector3();
+      camera.getWorldDirection(this._camFwd);
+    }
 
     // top up / recycle
     // top up a few per frame; a failed pick just means try again next frame
@@ -383,7 +449,10 @@ export class Traffic {
     let ci = 0, vi = 0;
     for (let k = this.cars.length - 1; k >= 0; k--) {
       const c = this.cars[k];
-      if (Math.hypot(c.x - px, c.z - pz) > DESPAWN) { this.cars.splice(k, 1); continue; }
+      const cd = Math.hypot(c.x - px, c.z - pz);
+      if (cd > HARD_DESPAWN || (cd > DESPAWN && !this._onScreen(c.x, c.z))) {
+        this.cars.splice(k, 1); continue;
+      }
 
       // slow for the car in front
       let block = 0;
@@ -428,7 +497,10 @@ export class Traffic {
     let pi = 0;
     for (let k = this.peds.length - 1; k >= 0; k--) {
       const p = this.peds[k];
-      if (Math.hypot(p.x - px, p.z - pz) > DESPAWN) { this.peds.splice(k, 1); continue; }
+      const pd = Math.hypot(p.x - px, p.z - pz);
+      if (pd > HARD_DESPAWN || (pd > DESPAWN && !this._onScreen(p.x, p.z))) {
+        this.peds.splice(k, 1); continue;
+      }
       const d = Math.hypot(p.x - px, p.z - pz);
       // scatter when a bike comes at them quickly
       if (d < 9 && pspeed > 7) {

@@ -446,8 +446,14 @@ export function makeLabel(text, color = 0xffffff, scale = 1) {
   tex.colorSpace = THREE.SRGBColorSpace;
   const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false });
   const s = new THREE.Sprite(mat);
-  const k = 0.019 * scale;
+  /* 0.019 put a name tag roughly a metre and a half tall, which fills a
+     third of the screen when a rider is alongside you. Sprites do not
+     shrink with distance the way a mesh does, so this has to be small. */
+  const k = 0.0085 * scale;
   s.scale.set(c.width * k, c.height * k, 1);
+  // keep them readable far off but out of the way up close
+  s.renderOrder = 10;
+  s.userData.baseScale = [c.width * k, c.height * k];
   s.renderOrder = 900;
   return s;
 }

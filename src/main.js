@@ -21,6 +21,7 @@ import { Effects } from './game/effects.js';
 import { Traffic } from './game/traffic.js';
 import { Police } from './game/police.js';
 import { Pickups } from './game/pickups.js';
+import { BotPack } from './game/bots.js';
 import { Trailer } from './game/trailer.js';
 
 import { HUD } from './ui/hud.js';
@@ -38,6 +39,7 @@ import { openFeedback } from './ui/feedback.js';
 import { NetClient, codeFromUrl } from './net/client.js';
 import { PRESETS, PRESET_BY_ID } from './vehicle/parts.js';
 import { stats as computeStats, buildFromPreset } from './vehicle/build.js';
+import { preloadRealModels } from './vehicle/glbmodels.js';
 
 /* ============================================================ */
 class Game {
@@ -64,12 +66,19 @@ class Game {
       msg.textContent = m;
     });
 
+    // real .glb machines load alongside the world so the first spawn has them
+    await preloadRealModels().catch(() => {});
+
     this.hud = new HUD(this.world);
     this.cam = new ChaseCam(this.engine.camera, this.world);
     this.fx = new Effects(this.engine.scene, this.world);
     this.traffic = new Traffic(this.engine.scene, this.world);
     this.police = new Police(this.world);
-    this.pickups = new Pickups(this.engine.scene, this.world, economy.data.cells || []);
+    /* economy.data is null until a save loads or the player picks a starter,
+       and boot runs before either — reading .cells here threw and killed the
+       whole boot for anyone arriving without a save, i.e. every new player. */
+    this.pickups = new Pickups(this.engine.scene, this.world, economy.data?.cells || []);
+    this.bots = new BotPack(this);
     this.slowmo = 1;
     this.tricks.onTrick = (label, pts, mult) => {
       if (pts < 8) return;
@@ -195,6 +204,8 @@ class Game {
   /* ---------------- play ---------------- */
   startPlay(firstTime = false) {
     audio.resume();
+    // the save may have arrived after boot (new game, or a fresh profile)
+    if (economy.data) this.pickups.setTaken(economy.data.cells || []);
     if (!this.player) this.spawnPlayer();
     else this.syncActiveVehicle();
 
@@ -509,6 +520,7 @@ class Game {
         if (Math.abs(b.speed) > b.stats.topSpeedMs * 0.75) pay += 1;
         if (b.pitch > 0.2) pay += 2;
         if (this.rideOutTimer > 3) pay += 2;
+        if (this.bots.nearCount(b.pos) >= 2) pay += 2;   // riding with the pack
         economy.earn(pay);
         this.hud.setCash(economy.cash, false);
       }
@@ -530,10 +542,11 @@ class Game {
     this.updateCharging(dt, b);
 
     /* ---- a city that is actually doing something ---- */
-    this.traffic.update(dt, b, this.police);
+    this.traffic.update(dt, b, this.police, this.engine.camera);
     this.police.sample(dt, b, this.world, this.traffic);
     this.police.update(dt, b);
     this.pickups.update(dt, b, this.engine.elapsed);
+    this.bots.update(dt, b, this.engine.elapsed);
     this.handleNearMiss(dt, b);
     this.handleTrafficHit(b);
     this.handlePickups(b);
@@ -709,7 +722,21 @@ class Game {
   minimapExtra(b) {
     const out = this.pickups.blips(b.pos.x, b.pos.z, 170);
     for (const u of this.police.units) out.push({ x: u.x, z: u.z, c: '#ff4d5e' });
+    for (const p of this.bots.blips()) out.push(p);
     return out;
+  }
+
+  /** start or stop a ride-out with AI riders */
+  toggleRideOut(n = 4) {
+    if (this.bots.active) {
+      this.bots.stop();
+      this.hud.toast('Ride-out over', 'info');
+      return 0;
+    }
+    const made = this.bots.start(n);
+    this.hud.toast(`🏍️ Ride-out: <b>${made}</b> rider${made === 1 ? '' : 's'} rolled out with you`, 'info', 4000);
+    audio.ui('ok');
+    return made;
   }
 
   minimapPlayers() {

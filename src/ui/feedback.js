@@ -252,6 +252,19 @@ function inboxPane(game, filter, setFilter) {
 /* ---------------- roadmap ---------------- */
 const CHANGELOG = [
   {
+    v: 'BETA 0.5', when: 'Update 5 — Real bikes and a pack to ride with',
+    lines: [
+      'The Talaria Sting R MX4 is in the game, as a real 3D model with real manufacturer figures.',
+      'Ride-out with bots: 2, 4 or 6 AI riders who follow the roads with you, on machines matched to yours.',
+      'Four starter machines now — two bikes and two scooters — and you can swap yours for free while it is your only one.',
+      'Fixed: the game would not start at all for anyone without an existing save.',
+      'Fixed: every building was inside-out, so you were looking at the back of every facade.',
+      'Fixed: traffic appearing and vanishing in plain sight.',
+      'Fixed: name tags the size of a car.',
+      'Fixed: lane markings painted straight through junctions and floated above them.',
+    ],
+  },
+  {
     v: 'BETA 0.4', when: 'Update 4 — It actually looks like a city',
     lines: [
       'Building facades: glass curtain walls, concrete, brick and corrugated steel, with real windows.',

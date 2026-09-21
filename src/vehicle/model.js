@@ -11,6 +11,7 @@
             └ riders
    ============================================================ */
 import * as THREE from 'three';
+import { cloneRealBikeParts } from './glbmodels.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { clamp, lerp } from '../core/util.js';
 
@@ -218,9 +219,80 @@ function buildRider(standing, cloth) {
 }
 
 /* ============================================================
+   REAL MODEL BUILDER
+
+   Wraps a converted .glb so it exposes exactly the same rig as the
+   procedural bike — tilt / body / steer / fork / wheels / riders — and
+   every pose, lean, wheelie and animation keeps working untouched.
+   ============================================================ */
+function buildRealVehicleModel(st) {
+  const parts = cloneRealBikeParts(st.realModel, st.paint?.hex ?? null);
+  if (!parts) return null;
+  const d = parts.def;
+
+  const root = new THREE.Group();
+  const tilt = new THREE.Group();
+  const body = new THREE.Group();
+  root.add(tilt); tilt.add(body);
+
+  const R = d.wheelR;
+  const WB = d.wheelbase;
+  body.position.y = R;                       // pivot on the rear axle contact
+
+  // shift the frame so its rear axle lands on the body origin
+  parts.frame.position.set(-d.rearAxle[0], -d.rearAxle[1], -d.rearAxle[2]);
+  body.add(parts.frame);
+
+  const rearW = new THREE.Group();
+  rearW.add(parts.wheelR);
+  body.add(rearW);
+
+  /* The forks are welded into the frame mesh, so steering turns the front
+     wheel alone. At any distance you actually ride at, a wheel that turns
+     reads far better than a bike with nothing moving at all. */
+  const headY = d.frontAxle[1] - d.rearAxle[1];
+  const headZ = d.frontAxle[2] - d.rearAxle[2];
+  const steer = new THREE.Group();
+  steer.position.set(0, headY, headZ);
+  body.add(steer);
+  const fork = new THREE.Group();
+  steer.add(fork);
+  const frontW = new THREE.Group();
+  frontW.add(parts.wheelF);
+  fork.add(frontW);
+
+  // riders, positioned from the model's own seat and bar points
+  const seat = d.seat, bars = d.bars;
+  const driver = buildRider(false, MATS.cloth);
+  driver.position.set(seat[0], seat[1] - d.rearAxle[1], seat[2] - d.rearAxle[2]);
+  body.add(driver);
+
+  const passenger = buildRider(false, MATS.cloth2 || MATS.cloth);
+  passenger.position.set(seat[0], seat[1] - d.rearAxle[1], seat[2] - d.rearAxle[2] - 0.34);
+  passenger.visible = false;
+  body.add(passenger);
+
+  root.userData = {
+    tilt, body, steer, fork, rearW, frontW, driver, passenger,
+    wheelR: R, wheelbase: WB, scooter: false,
+    headY, headZ,
+    barY: bars[1] - d.rearAxle[1] - headY,
+    barZ: bars[2] - d.rearAxle[2] - headZ,
+    seats: st.seats,
+    real: true,
+  };
+  return root;
+}
+
+/* ============================================================
    MAIN BUILDER
    ============================================================ */
 export function buildVehicleModel(st) {
+  // a frame that names a real model gets the real model, if it has loaded
+  if (st.realModel) {
+    const real = buildRealVehicleModel(st);
+    if (real) return real;
+  }
   const paint = paintMaterial(st.paint);
   const scooter = st.cls === 'scooter';
   const R = st.wheelR;

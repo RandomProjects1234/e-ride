@@ -72,6 +72,15 @@ const FRAMES = [
     maxTireW: 72, stiffness: 0.86, maxLoadKg: 165, seats: 1, wheelbase: 1.28, cogH: 0.54, style: 'dh',
     desc: 'Downhill chassis. Long, slack, absurdly stable in the air.' },
 
+  /* A real machine, with a real model in models/. Figures are the
+     manufacturer's: 1350 mm wheelbase, 19"/16" wheels, 58 kg dry, a
+     1500 W nominal / 8000 W peak mid-drive on a 60 V 45 Ah pack. */
+  { id: 'f-talaria', name: 'Talaria Sting R MX4', brand: 'Talaria', tier: 'performance', price: 4900, weight: 58.0,
+    cls: 'bike', mounts: ['mid-drive', 'hub-rear'], maxMotorW: 12000, maxVolts: 72, bayWh: 3200, wheelSize: 19,
+    maxTireW: 110, stiffness: 0.88, maxLoadKg: 150, seats: 1, wheelbase: 1.35, cogH: 0.50, style: 'moto',
+    realModel: 'talaria-sting-r',
+    desc: 'The real thing. Light-moto chassis, 19-inch front, and the bike half the internet learned to wheelie on.' },
+
   { id: 'f-surron', name: 'Halberd HX Moto', brand: 'Halberd', tier: 'exotic', price: 6200, weight: 34.0,
     cls: 'bike', mounts: ['mid-drive', 'dual-hub', 'hub-rear'], maxMotorW: 24000, maxVolts: 144, bayWh: 4200, wheelSize: 19,
     maxTireW: 120, stiffness: 0.93, maxLoadKg: 260, seats: 2, wheelbase: 1.34, cogH: 0.52, style: 'moto',
@@ -155,6 +164,11 @@ const MOTORS = [
     mount: 'dual-hub', powerW: 2400, peakW: 4400, voltMin: 52, voltMax: 84, ampsMax: 68, torqueNm: 96,
     rpmMax: 1500, eff: 0.85, desc: 'Two hubs, one throttle. Traction for days.' },
 
+  { id: 'm-talaria', name: 'Talaria MX4 Mid-Drive', brand: 'Talaria', tier: 'performance', price: 1450, weight: 9.4,
+    mount: 'mid-drive', powerW: 4000, peakW: 8000, voltMin: 48, voltMax: 84, ampsMax: 150, torqueNm: 175,
+    rpmMax: 6200, gear: 5.4, eff: 0.90,
+    desc: 'Sealed mid-drive, 1.5 kW nominal and 8 kW when you ask nicely.' },
+
   { id: 'm-surron', name: 'Halberd HX8 Mid', brand: 'Halberd', tier: 'exotic', price: 3900, weight: 11.2,
     mount: 'mid-drive', powerW: 8000, peakW: 14000, voltMin: 60, voltMax: 144, ampsMax: 180, torqueNm: 240,
     rpmMax: 7600, gear: 6.2, eff: 0.91, desc: 'Light-moto motor. Eight kilowatts of "please hold on".' },
@@ -206,6 +220,10 @@ const BATTERIES = [
     volts: 60, ah: 24, maxA: 80, chem: 'Li-ion 21700', cycles: 900, desc: 'Fat 60V brick. Serious current on tap.' },
   { id: 'b-72-32', name: 'Ampere 72V 32Ah', brand: 'Ampere Industries', tier: 'performance', price: 1450, weight: 14.2,
     volts: 72, ah: 32, maxA: 120, chem: 'Li-ion 21700', cycles: 900, desc: '2.3 kWh. Heavy, but it will not sag on you.' },
+  { id: 'b-60-45', name: 'Talaria 60V 45Ah', brand: 'Talaria', tier: 'performance', price: 1300, weight: 17.5,
+    volts: 60, ah: 45, maxA: 150, chem: '16S15P 21700', cycles: 800,
+    desc: 'The Sting R pack. Big, heavy, and good for a genuine 40 miles.' },
+
   { id: 'b-84-30', name: 'Halberd 84V 30Ah LiPo', brand: 'Halberd', tier: 'performance', price: 2100, weight: 12.8,
     volts: 84, ah: 30, maxA: 260, chem: 'LiPo 20C', cycles: 300, desc: 'LiPo. Enormous current, short life, mild fire risk.' },
   { id: 'b-144-40', name: 'Nyx 144V 40Ah', brand: 'Nyx Dynamics', tier: 'exotic', price: 8400, weight: 31.0,
@@ -267,6 +285,10 @@ const TIRES = [
     size: 10, width: 66, grip: 0.88, roll: 0.011, speedMph: 45, desc: 'Tubeless pneumatic. Night-and-day over solids.' },
   { id: 't-scoot11', name: 'Ampere 11" Street', brand: 'Ampere Industries', tier: 'performance', price: 110, weight: 1.6,
     size: 11, width: 90, grip: 0.99, roll: 0.010, speedMph: 72, desc: 'Wide 11-inch performance scooter tyre.' },
+  { id: 't-talaria19', name: 'Talaria MX 19/16 Knobbly', brand: 'Talaria', tier: 'performance', price: 260, weight: 8.0,
+    size: 19, width: 100, grip: 1.02, roll: 0.011, speedMph: 75,
+    desc: 'Proper dirt rubber. Hopeless on wet tarmac, superb everywhere else.' },
+
   { id: 't-moto19', name: 'Halberd Moto 19×2.75', brand: 'Halberd', tier: 'performance', price: 190, weight: 5.2,
     size: 19, width: 108, grip: 1.08, roll: 0.013, speedMph: 95, desc: 'Real motorcycle rubber on a light-moto rim.' },
   { id: 't-slick275', name: 'Nyx Race Slick 27.5', brand: 'Nyx Dynamics', tier: 'exotic', price: 580, weight: 2.9,
@@ -439,7 +461,7 @@ export const PRESETS = [
              tires: 't-fat26', brakes: 'br-hyd', suspension: 's-coil', cockpit: 'k-riser', aero: 'a-none', paint: 'p-orange' },
   },
   {
-    id: 'v-g5', name: 'Voltek G5 Deck', cls: 'scooter',
+    id: 'v-g5', name: 'Voltek G5 Deck', cls: 'scooter', starter: true,
     blurb: 'Two-up scooter with a real pneumatic tyre. The first scooter worth owning.',
     parts: { frame: 'f-g5', motor: 'm-1000s', battery: 'b-48-14', controller: 'c-45',
              tires: 't-scoot10', brakes: 'br-mech', suspension: 's-scoot', cockpit: 'k-scoot', aero: 'a-none', paint: 'p-cyan' },
@@ -455,6 +477,13 @@ export const PRESETS = [
     blurb: 'Dual-motor performance scooter. Launches harder than most motorbikes.',
     parts: { frame: 'f-wolf', motor: 'm-dual2k', battery: 'b-72-32', controller: 'c-80',
              tires: 't-scoot11', brakes: 'br-4pot', suspension: 's-dual', cockpit: 'k-scoot', aero: 'a-visor', paint: 'p-violet' },
+  },
+  {
+    id: 'v-talaria', name: 'Talaria Sting R MX4', cls: 'bike', real: true,
+    blurb: 'The real Talaria. 8 kW peak, 60 V 45 Ah, and a genuine dirt-bike chassis under you.',
+    parts: { frame: 'f-talaria', motor: 'm-talaria', battery: 'b-60-45', controller: 'c-200',
+             tires: 't-talaria19', brakes: 'br-4pot', suspension: 's-dh', cockpit: 'k-moto',
+             aero: 'a-none', paint: 'p-black' },
   },
   {
     id: 'v-hx', name: 'Halberd HX Moto', cls: 'bike',

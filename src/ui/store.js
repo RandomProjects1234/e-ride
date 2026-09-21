@@ -88,7 +88,7 @@ function vehiclePane(game) {
 }
 
 function showSpecs(name, st) {
-  const rng = st.rangeKm === Infinity ? '∞' : Math.round(st.rangeKm) + ' km';
+  const rng = st.selfFuelled ? '∞' : Math.round(st.rangeKm) + ' km';
   let rows = '';
   for (const s of SLOTS) {
     const p = st.parts[s.id];
@@ -102,7 +102,7 @@ function showSpecs(name, st) {
       ${bar('Wheelie', st.wheelieEase / 2, st.wheelieEase.toFixed(2))}
       ${bar('Handling', st.handling, Math.round(st.handling * 100))}
       ${bar('Stability', st.stability, Math.round(st.stability * 100))}
-      ${bar('Range', clamp((st.rangeKm === Infinity ? 400 : st.rangeKm) / 400, 0, 1) ** 0.6, rng)}
+      ${bar('Range', clamp((st.selfFuelled ? 400 : st.rangeKm) / 400, 0, 1) ** 0.6, rng)}
     </div>
     <div class="hr"></div>
     <div class="kv"><span>0–30 / 0–60 mph</span><b>${st.t30 ? st.t30.toFixed(1) + 's' : '—'} / ${st.t60 ? st.t60.toFixed(1) + 's' : '—'}</b></div>

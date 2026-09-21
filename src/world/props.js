@@ -167,7 +167,12 @@ export function buildProps(world) {
 
     // main mass, built as a rotated box
     const hw = w / 2, hd = d / 2;
-    const corners = [rot(-hw, -hd), rot(hw, -hd), rot(hw, hd), rot(-hw, hd)];
+    /* Corner order decides the winding of every face derived from it. This
+       used to run the other way, which wound all four walls and the roof
+       INWARD: with a double-sided material that merely looked odd, but a
+       textured single-sided one shows you the back of the facade, so every
+       building appeared to have its texture mirrored. */
+    const corners = [rot(-hw, hd), rot(hw, hd), rot(hw, -hd), rot(-hw, -hd)];
     const top = y0 + h;
     /* Walls are UV'd in units of bays across and floors up, so the facade
        texture lands at a believable scale whatever size the building is.

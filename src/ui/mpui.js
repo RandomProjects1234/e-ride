@@ -84,6 +84,31 @@ export function openMultiplayer(game) {
       grid.appendChild(joinCard);
 
       body.appendChild(grid);
+
+      /* Having nobody online is the normal case, so the AI pack sits right
+         next to the room controls rather than buried somewhere. */
+      const solo = el('div', 'card');
+      solo.style.marginTop = '12px';
+      solo.innerHTML = `<h4>Ride-out with bots</h4>
+        <div class="muted">No friends online? Roll out with AI riders. They follow the roads
+        with you, pull wheelies, crash into things and catch back up &mdash; and riding in a
+        pack still pays the ride-out bonus.</div>`;
+      const sr = el('div', 'card-row');
+      for (const n of [2, 4, 6]) {
+        sr.appendChild(btn(`${n} riders`, 'sm', () => {
+          if (game.bots.active) game.bots.stop();
+          game.toggleRideOut(n);
+          refreshTop();
+        }));
+      }
+      if (game.bots.active) {
+        sr.appendChild(btn('Stop', 'warn sm', () => { game.bots.stop(); refreshTop(); }));
+      }
+      solo.appendChild(sr);
+      if (game.bots.active) {
+        solo.appendChild(el('div', 'note ok', `<b>${game.bots.count}</b> riders are out with you.`));
+      }
+      body.appendChild(solo);
     } else {
       /* connected: show the code big, with a copyable link */
       const codeBox = el('div', 'note ok');

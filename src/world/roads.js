@@ -56,6 +56,20 @@ export function buildRoads(roadNet) {
     }
 
     // ----- markings -----
+    /* Lane markings must stop at a junction. Painting them straight
+       through means the crossing road's dashes float above the other
+       road's surface at whatever height difference the two were graded
+       to — which reads as white slabs lying about in the intersection. */
+    const inJunction = (x, z) => {
+      const q = roadNet.nearest(x, z, 30);
+      if (!q || q.road === r) return false;
+      // the wider road owns the junction; ties go to the one drawn first
+      if (q.road.w > r.w || (q.road.w === r.w && q.road.id < r.id)) {
+        return q.dist < q.road.half + 0.6;
+      }
+      return false;
+    };
+
     if (r.markings === 'dashed' && r.type !== 'trail') {
       // centre dashes
       let d = 0, acc = 0;
@@ -67,7 +81,7 @@ export function buildRoads(roadNet) {
         const segLen = Math.hypot(bx - ax, bz - az);
         if (segLen < 0.01) continue;
         const phase = acc % period;
-        if (phase < dashLen) {
+        if (phase < dashLen && !inJunction((ax + bx) / 2, (az + bz) / 2)) {
           const [tx, tz] = tangents(r.pts, i);
           const lx = -tz, lz = tx;
           const hw = 0.19;

@@ -193,6 +193,22 @@ export class Economy {
     if (this.data.garage.some((v) => v.id === id)) { this.data.active = id; this.save(); }
   }
 
+  /** Trade the one starter machine for a different starter, free. Only
+   *  legal while it is the only vehicle owned, so it cannot be used to
+   *  launder a built-up bike back into a fresh one. */
+  swapStarter(presetId) {
+    if (this.data.garage.length !== 1) return { ok: false, msg: 'Only while the starter is your only machine.' };
+    const p = PRESET_BY_ID.get(presetId);
+    if (!p || !p.starter) return { ok: false, msg: 'That is not a starter machine.' };
+    const old = this.data.garage[0];
+    if (old.preset === presetId) return { ok: false, msg: 'You already ride that one.' };
+    this.data.garage.length = 0;
+    const v = this.addVehicle(p.name, buildFromPreset(p.id), { preset: p.id });
+    this.data.active = v.id;
+    this.save();
+    return { ok: true, vehicle: v };
+  }
+
   addVehicle(name, build, opts = {}) {
     const v = {
       id: uid(), name, build: { ...build }, odo: 0, charge: 1,

@@ -73,6 +73,7 @@ export function openGarage(game) {
 
     const foot = el('div');
     foot.appendChild(btn('Build something new', '', () => newBuildFlow(game)));
+    if (canSwapStarter()) foot.appendChild(btn('Swap starter', 'ghost', () => swapStarterFlow(game)));
     foot.appendChild(el('div', 'spacer'));
     foot.appendChild(btn('Close', 'primary', () => closePanel()));
 
@@ -116,6 +117,65 @@ function vehicleMenu(game, v) {
     }
     foot.appendChild(btn('Done', 'primary', () => closePanel()));
     return panel({ title: v.name, sub: 'specification', size: 'sm', body, foot, onBack: () => closePanel() });
+  });
+}
+
+/** You are stuck with whatever you picked in the first thirty seconds of
+ *  the game, before you knew what any of the numbers meant. While the
+ *  starter is still the only machine you own, let it be traded for one of
+ *  the others, free. */
+function canSwapStarter() {
+  const v = economy.vehicles;
+  if (v.length !== 1) return false;
+  return PRESETS.some((p) => p.starter && p.id === v[0].preset);
+}
+
+function swapStarterFlow(game) {
+  let sel = economy.vehicles[0]?.preset || 'v-light';
+  openPanel(() => {
+    const body = el('div');
+    body.appendChild(el('div', 'note info',
+      'Traded straight across, no charge. Available while your starter is the only machine in the garage \u2014 once you own something else, this is your garage and you live with it.'));
+    const grid = el('div', 'grid c2');
+    grid.style.marginTop = '12px';
+    for (const p of PRESETS.filter((x) => x.starter)) {
+      const st = computeStats(buildFromPreset(p.id), { riders: 1 });
+      const owned = economy.vehicles[0]?.preset === p.id;
+      const c = el('div', 'card' + (sel === p.id ? ' sel' : ''));
+      c.style.cursor = 'pointer';
+      c.innerHTML = `
+        <span class="tier t-${st.tier}">${p.cls === 'scooter' ? 'E-SCOOTER' : 'E-BIKE'}</span>
+        <h4>${escapeHtml(p.name)}</h4>
+        <div class="muted">${escapeHtml(p.blurb)}</div>
+        <div class="stats">
+          ${bar('Top speed', st.topSpeedMph / 60, Math.round(st.topSpeedMph) + ' mph')}
+          ${bar('Wheelie', st.wheelieEase / 2, st.wheelieEase > 1.4 ? 'Easy' : st.wheelieEase > 0.85 ? 'Fair' : 'Tricky')}
+          ${bar('Handling', st.handling, String(Math.round(st.handling * 100)))}
+          ${bar('Range', clamp(st.rangeKm / 120, 0, 1), Math.round(st.rangeKm) + ' km')}
+        </div>
+        <div class="card-row"><span class="muted">${st.seats > 1 ? '2 seats' : '1 seat'}</span>
+        <span class="price ${owned ? 'owned' : ''}">${owned ? 'YOURS' : 'FREE SWAP'}</span></div>`;
+      c.onclick = () => { sel = p.id; audio.ui('click'); refreshTop(); };
+      grid.appendChild(c);
+    }
+    body.appendChild(grid);
+
+    const foot = el('div');
+    foot.appendChild(el('div', 'spacer'));
+    foot.appendChild(btn('Swap to this', 'primary', () => {
+      const cur = economy.vehicles[0];
+      if (!cur || cur.preset === sel) { closePanel(); return; }
+      const res = economy.swapStarter(sel);
+      if (!res.ok) { game.hud.toast(escapeHtml(res.msg), 'bad'); audio.ui('err'); return; }
+      game.syncActiveVehicle();
+      game.hud.setVehicleName(res.vehicle.name);
+      game.hud.toast(`Swapped to <b>${escapeHtml(res.vehicle.name)}</b>`, 'cash');
+      audio.ui('ok');
+      closePanel();
+      refreshTop();
+    }));
+    return panel({ title: 'Swap your starter', sub: 'trade it for another, free', size: 'md', body, foot,
+                   onBack: () => closePanel() });
   });
 }
 
@@ -324,7 +384,7 @@ function buildSpecHtml(shown, cur, prev, draft) {
   const s = shown;
   const c = prev ? cur : null;      // compare target
   const d = (key, val) => (c ? delta(val, c[key] ?? 0) : '');
-  const rng = s.rangeKm === Infinity ? '∞' : Math.round(s.rangeKm) + ' km';
+  const rng = s.selfFuelled ? '∞' : Math.round(s.rangeKm) + ' km';
 
   return `
     <div style="font-size:11px;letter-spacing:.18em;color:#5c6883;font-weight:800;text-transform:uppercase">Performance</div>
@@ -336,7 +396,7 @@ function buildSpecHtml(shown, cur, prev, draft) {
       ${bar('Handling', s.handling, Math.round(s.handling * 100), d('handling', s.handling))}
       ${bar('Stability', s.stability, Math.round(s.stability * 100), d('stability', s.stability))}
       ${bar('Braking', clamp(s.brakeDecel / 30, 0, 1), s.brakeDecel.toFixed(1) + ' m/s²', d('brakeDecel', s.brakeDecel))}
-      ${bar('Range', clamp((s.rangeKm === Infinity ? 400 : s.rangeKm) / 400, 0, 1) ** 0.6, rng, d('rangeKm', s.rangeKm === Infinity ? 1e9 : s.rangeKm))}
+      ${bar('Range', clamp((s.selfFuelled ? 400 : s.rangeKm) / 400, 0, 1) ** 0.6, rng, d('rangeKm', s.selfFuelled ? 1e9 : s.rangeKm))}
       ${bar('Durability', s.durability, Math.round(s.durability * 100), d('durability', s.durability))}
     </div>
     <div class="hr"></div>
@@ -353,7 +413,7 @@ function buildSpecHtml(shown, cur, prev, draft) {
 }
 
 function specTable(st, v) {
-  const rng = st.rangeKm === Infinity ? '∞' : Math.round(st.rangeKm) + ' km';
+  const rng = st.selfFuelled ? '∞' : Math.round(st.rangeKm) + ' km';
   let parts = '';
   for (const s of SLOTS) {
     const p = v.build[s.id] ? getPart(v.build[s.id]) : null;
@@ -365,7 +425,7 @@ function specTable(st, v) {
       ${bar('Power', clamp(st.powerW / 300000, 0, 1) ** 0.35, kw(st.powerW))}
       ${bar('Wheelie', st.wheelieEase / 2, st.wheelieEase.toFixed(2))}
       ${bar('Handling', st.handling, Math.round(st.handling * 100))}
-      ${bar('Range', clamp((st.rangeKm === Infinity ? 400 : st.rangeKm) / 400, 0, 1) ** 0.6, rng)}
+      ${bar('Range', clamp((st.selfFuelled ? 400 : st.rangeKm) / 400, 0, 1) ** 0.6, rng)}
     </div>
     <div class="hr"></div>${parts}
     <div class="hr"></div>

@@ -1,8 +1,8 @@
-# E-Ride — BETA 0.4
+# E-Ride — BETA 0.5
 
 [![play](https://img.shields.io/badge/play-randomprojects1234.github.io%2Fe--ride-39e6a4)](https://randomprojects1234.github.io/e-ride/)
 [![licence](https://img.shields.io/badge/licence-MIT-16c2ff)](LICENSE)
-[![version](https://img.shields.io/badge/version-BETA%200.4-a06bff)](#versions)
+[![version](https://img.shields.io/badge/version-BETA%200.5-a06bff)](#versions)
 
 **Play it: <https://randomprojects1234.github.io/e-ride/>**
 
@@ -221,6 +221,7 @@ followed by 1.0.
 
 | | |
 | --- | --- |
+| **BETA 0.5** | the real Talaria Sting R MX4, AI ride-out packs, four starters, and a boot crash that stopped new players playing at all |
 | **BETA 0.4** | a graphics pass — textured facades, environment reflections, rebuilt vehicle and character models |
 | **BETA 0.3** | multiplayer with no server — host a room, share a five-character code |
 | **BETA 0.2** | traffic, pedestrians, near misses, police pursuit, 120 collectible cells, boost gates, slow-mo on big air — and e-scooters can wheelie now |
@@ -253,6 +254,39 @@ serve.py    dev server + capture/feedback endpoints
 ```
 
 Nothing is generated or minified — every file in `src/` is the source.
+
+---
+
+## Real machines
+
+Most of the catalogue is procedural, but the **Talaria Sting R MX4** is a real
+bike with a real model and the manufacturer's real figures — 1350 mm
+wheelbase, 19"/16" wheels, 60 V 45 Ah, 8 kW peak. It computes to 44 mph in
+game against the real bike's 47.
+
+The download that model came from was 89 MB of ASCII OBJ at 1,109,634
+triangles, welded into a single blob with no normals and no materials. The
+two scripts in `tools/` decimate it to 36,450 triangles and 676 KB, and split
+it into frame / front wheel / rear wheel so the wheels turn and the bike
+steers. See [MODELS.md](MODELS.md) — including the licence caveat.
+
+A real model is wrapped to expose exactly the same rig as a procedural bike,
+so leaning, wheelies and every animation keep working. If the file is missing,
+the procedural bike is used and the game carries on.
+
+---
+
+## Ride-outs with bots
+
+Riding in a pack is the best thing in the game and it needed five other people
+online. **Multiplayer → Ride-out with bots** puts 2, 4 or 6 AI riders on the
+road with you. They use the real physics and real builds off the catalogue,
+follow the road network, pull wheelies, crash and catch back up — and riding
+in a pack still pays the ride-out bonus.
+
+The machines they turn up on are chosen from what *you* are riding. A pack on
+23 mph commuters behind a 44 mph bike is not a pack, it is a queue of dots on
+the minimap.
 
 ---
 
