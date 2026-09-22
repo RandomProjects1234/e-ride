@@ -119,11 +119,24 @@ class Input {
       if (!document.pointerLockElement && !this.mouse.right) this.mouse.dragging = false;
     });
 
-    // wheel zooms the camera
+    /* Wheel zooms the camera.
+
+       deltaY is not comparable between devices: Chrome reports ~100 per
+       notch in pixels, Firefox reports 3 in *lines*, and a trackpad
+       reports a stream of single digits. The old maths ignored deltaMode
+       and applied a 0.5 floor to every event, so one Firefox notch read
+       as a fifth of a Chrome one while a trackpad flick fired dozens of
+       half-notches and sent the zoom flying. Normalise to pixels first,
+       then one standard notch is 1.0 and small deltas stay small. */
     window.addEventListener('wheel', (e) => {
       if (!this.enabled) return;
       if (e.target && e.target.closest && e.target.closest('#menu-root, #touch')) return;
-      this.mouse.wheel += Math.sign(e.deltaY) * Math.min(3, Math.abs(e.deltaY) / 50 + 0.5);
+      let d = e.deltaY;
+      // Firefox reports 3 lines per notch, and a notch is ~100 px, so a
+      // line is ~33 px — not a text line height
+      if (e.deltaMode === 1) d *= 33;                       // lines -> px
+      else if (e.deltaMode === 2) d *= 300;                 // pages -> ~3 notches
+      this.mouse.wheel += clamp(d / 100, -4, 4);
       e.preventDefault();
     }, { passive: false });
 

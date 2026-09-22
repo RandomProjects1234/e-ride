@@ -71,8 +71,15 @@ export class ChaseCam {
   /** wheel notches: positive = zoom out */
   zoomBy(n) {
     if (!n) return;
-    this.zoomWant = clamp(this.zoomWant * (1 + n * 0.16), 0.0, 3.2);
-    if (this.zoomWant < 0.18) this.zoomWant = 0;          // snap into first person
+    /* This used to be a multiply, with first person stored as zoomWant 0 —
+       and zero times anything is zero, so once you scrolled into first
+       person no amount of scrolling back out ever escaped it. Work from a
+       non-zero floor and only snap in when actually zooming in. */
+    const FIRST = 0.24;
+    const cur = this.zoomWant <= 0 ? FIRST : this.zoomWant;
+    let next = clamp(cur * Math.pow(1.22, n), 0.22, 3.2);
+    if (n < 0 && next <= FIRST + 0.005) next = 0;         // snap into first person
+    this.zoomWant = next;
     this.sinceOrbit = 0;
   }
 
